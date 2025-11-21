@@ -216,11 +216,47 @@
 .pay-input-giant:focus { border-color: #10b981; }
 
 /* Ticket Impreso (Oculto en pantalla) */
+
+
 @media print {
-    .pos-layout { display: none; }
-    .modal-overlay { 
-        position: static; background: white; display: block !important; 
+    /* 1. Ocultar todo el cuerpo por defecto */
+    body * {
+        visibility: hidden;
+        height: auto; /* Resetear alturas fijas */
+        overflow: visible; /* Permitir que el contenido fluya */
     }
-    .modal-card { box-shadow: none; width: 100%; }
-    .no-print { display: none; }
+
+    /* 2. Hacer visible solo el contenedor del modal y el ticket */
+    .modal-overlay, .modal-card, #printable-area, #printable-area * {
+        visibility: visible;
+    }
+
+    /* 3. Posicionar el ticket en la hoja */
+    .modal-overlay {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+        background: white; /* Fondo blanco limpio */
+        display: block !important; /* Asegurar que no esté hidden */
+        z-index: 9999;
+    }
+
+    .modal-card {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%; /* O usar un ancho fijo como 80mm si es térmica */
+        max-width: none;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        border: none;
+    }
+
+    /* 4. Ocultar botones de la interfaz */
+    .no-print {
+        display: none !important;
+    }
 }

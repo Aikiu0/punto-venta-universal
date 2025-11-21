@@ -12,9 +12,13 @@ export function renderLogin() {
                     </div>
                     <div class="form-group">
                         <label>Contraseña</label>
-                        <input type="password" id="password" placeholder="••••••••" required>
+                        <input type="password" id="password" placeholder="Contraseña" required>
                     </div>
                     <button type="submit" class="btn-login" id="btn-submit">Iniciar Sesión</button>
+                    <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                    <p style="color:#666;">¿Eres cliente?</p>
+                    <a href="#/shop" style="color:#7A3F9D; font-weight:bold; text-decoration:none;">Visitar Tienda en Línea &rarr;</a>
+                    </div>
                     <div id="error-message" class="error-msg"></div>
                 </form>
             </div>
