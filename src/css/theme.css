@@ -1,0 +1,57 @@
+:root {
+    /* --- MODO CLARO (Tus colores actuales) --- */
+    
+    /* Fondos */
+    --bg-body: #f1f5f9;       /* Slate-100 (Fondo general) */
+    --bg-card: #ffffff;       /* Blanco (Tarjetas, Header) */
+    --bg-input: #f8fafc;      /* Fondo de inputs */
+    --bg-hover: #f8fafc;      /* Hover en items */
+    
+    /* Textos */
+    --text-primary: #1e293b;  /* Slate-800 (Títulos, Precios) */
+    --text-secondary: #64748b;/* Slate-500 (Subtítulos, Iconos) */
+    --text-placeholder: #94a3b8;
+    
+    /* Bordes */
+    --border-color: #e2e8f0;
+    --border-soft: #f1f5f9;
+
+    /* Marca y Acciones */
+    --brand-color: #7A3F9D;   /* Tu morado */
+    --brand-glow: rgba(122, 63, 157, 0.1);
+    
+    --success-bg: #10b981;    /* Verde botón pago */
+    --success-bg-hover: #059669;
+    --success-text: #ffffff;
+
+    /* Admin Badge */
+    --admin-bg: #fff7ed;
+    --admin-text: #ea580c;
+}
+
+[data-theme="dark"] {
+    /* --- MODO OSCURO (Inversión inteligente) --- */
+    
+    /* Fondos - Usamos Slate muy oscuro */
+    --bg-body: #0f172a;       /* Slate-900 */
+    --bg-card: #1e293b;       /* Slate-800 */
+    --bg-input: #334155;      /* Slate-700 */
+    --bg-hover: #334155;
+    
+    /* Textos */
+    --text-primary: #f1f5f9;  /* Blanco casi puro */
+    --text-secondary: #94a3b8;/* Gris claro */
+    --text-placeholder: #64748b;
+    
+    /* Bordes */
+    --border-color: #334155;
+    --border-soft: #1e293b;
+
+    /* Marca - Se mantiene o se ajusta brillo */
+    --brand-color: #a855f7;   /* Un morado un poco más brillante para fondo oscuro */
+    --brand-glow: rgba(168, 85, 247, 0.2);
+
+    /* Admin Badge (Oscuro) */
+    --admin-bg: #431407;
+    --admin-text: #fb923c;
+}

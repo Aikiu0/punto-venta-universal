@@ -1,27 +1,32 @@
-/* src/css/admin.css - DISEÑO PROFESIONAL */
+/* src/css/admin.css - DISEÑO PROFESIONAL & MODO OSCURO */
 
-/* Layout Principal (Sidebar + Contenido) */
+/* Layout Principal */
 .admin-container {
     display: grid;
-    grid-template-columns: 260px 1fr; /* 260px Sidebar, resto Contenido */
+    grid-template-columns: 260px 1fr;
     min-height: 100vh;
-    background-color: #f3f4f6;
+    background-color: var(--bg-body); /* Variable */
+    color: var(--text-primary);       /* Variable */
     font-family: 'Montserrat', sans-serif;
+    transition: background-color 0.3s ease;
 }
 
 /* --- SIDEBAR (Barra Lateral) --- */
 .admin-sidebar {
-    background-color: #1e293b; /* Azul oscuro profesional */
-    color: white;
+    background-color: #1e293b; /* Sidebar siempre oscuro por diseño, o usa var(--bg-sidebar) */
+    color: #e2e8f0;            /* Texto claro fijo para sidebar oscuro */
     display: flex;
     flex-direction: column;
     padding: 20px;
+    border-right: 1px solid var(--border-color);
 }
+/* Si quieres que el sidebar cambie en modo claro/oscuro, usa variables aquí. 
+   Por ahora lo dejé oscuro fijo porque se ve más profesional. */
 
 .sidebar-logo {
     font-size: 1.5rem;
     font-weight: bold;
-    color: #a78bfa; /* Tono lila suave */
+    color: var(--brand-color);
     margin-bottom: 40px;
     display: flex; align-items: center; gap: 10px;
 }
@@ -33,7 +38,7 @@
 .menu-item {
     padding: 12px 15px;
     border-radius: 8px;
-    color: #cbd5e1;
+    color: #cbd5e1; /* Gris claro para fondo oscuro */
     text-decoration: none;
     cursor: pointer;
     transition: all 0.3s;
@@ -43,21 +48,21 @@
 }
 
 .menu-item:hover {
-    background-color: #334155;
+    background-color: rgba(255,255,255,0.1);
     color: white;
 }
 
 .menu-item.active {
-    background-color: #7A3F9D; /* Tu color de marca */
+    background-color: var(--brand-color);
     color: white;
-    box-shadow: 0 4px 12px rgba(122, 63, 157, 0.4);
+    box-shadow: 0 4px 12px var(--brand-glow);
 }
 
 .menu-item.logout {
-    margin-top: auto; /* Empujarlo al fondo */
-    color: #f87171;
+    margin-top: auto;
+    color: var(--danger-color); /* Rojo variable */
 }
-.menu-item.logout:hover { background: rgba(248, 113, 113, 0.1); }
+.menu-item.logout:hover { background: rgba(239, 68, 68, 0.1); }
 
 
 /* --- CONTENIDO PRINCIPAL --- */
@@ -66,52 +71,57 @@
     overflow-y: auto;
 }
 
-/* Header Superior (Título y Usuario) */
+/* Header */
 .content-header {
     display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 30px;
 }
-.page-title h1 { margin: 0; font-size: 1.8rem; color: #1e293b; }
-.page-title p { color: #64748b; margin-top: 5px; }
+.page-title h1 { margin: 0; font-size: 1.8rem; color: var(--text-primary); }
+.page-title p { color: var(--text-secondary); margin-top: 5px; }
 
-/* Botones Profesionales */
+/* Botones */
 .btn-primary {
-    background: #7A3F9D; color: white; border: none; padding: 10px 20px;
+    background: var(--brand-color); color: white; border: none; padding: 10px 20px;
     border-radius: 8px; font-weight: 600; cursor: pointer;
     display: flex; align-items: center; gap: 8px;
-    box-shadow: 0 4px 6px rgba(122, 63, 157, 0.2);
+    box-shadow: 0 4px 6px var(--brand-glow);
     transition: transform 0.2s;
 }
-.btn-primary:hover { transform: translateY(-2px); background: #6b368a; }
+.btn-primary:hover { transform: translateY(-2px); filter: brightness(1.1); }
 
 /* Tarjetas (Cards) */
 .card-panel {
-    background: white;
+    background: var(--bg-card); /* Variable */
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.03);
     padding: 25px;
-    border: 1px solid #f1f5f9;
+    border: 1px solid var(--border-soft);
+    color: var(--text-primary);
 }
 
 /* Tabla Estilizada */
 .modern-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
 .modern-table th { 
     text-align: left; padding: 15px; 
-    background: #f8fafc; color: #64748b; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;
-    border-bottom: 2px solid #e2e8f0;
+    background: var(--bg-input); /* Fondo grisaceo variable */
+    color: var(--text-secondary); 
+    font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;
+    border-bottom: 2px solid var(--border-color);
 }
 .modern-table td { 
-    padding: 15px; border-bottom: 1px solid #f1f5f9; color: #334155; 
+    padding: 15px; border-bottom: 1px solid var(--border-soft); color: var(--text-primary);
 }
-.modern-table tr:hover { background-color: #f8fafc; }
+.modern-table tr:hover { background-color: var(--bg-hover); }
 
 /* Acciones de Tabla */
 .action-btn {
     border: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; transition: 0.2s;
+    display: inline-flex; justify-content: center; align-items: center;
 }
-.edit-btn { background: #e0f2fe; color: #0284c7; }
+.edit-btn { background: var(--bg-input); color: var(--primary-color); } /* Azul */
 .edit-btn:hover { background: #0284c7; color: white; }
-.delete-btn { background: #fee2e2; color: #dc2626; }
+
+.delete-btn { background: var(--bg-input); color: var(--danger-color); } /* Rojo */
 .delete-btn:hover { background: #dc2626; color: white; }
 
 /* Modal Moderno */
@@ -121,6 +131,9 @@
     display: none; justify-content: center; align-items: center; z-index: 1000;
 }
 .modal-glass {
-    background: white; width: 450px; padding: 30px; border-radius: 16px;
+    background: var(--bg-card); /* Variable */
+    width: 450px; padding: 30px; border-radius: 16px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
 }

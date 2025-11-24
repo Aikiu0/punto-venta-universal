@@ -4,7 +4,10 @@ import './css/login.css';
 import './css/pos.css'; 
 import './css/admin.css'; 
 import './css/shop.css'; 
+import { ThemeService } from './services/theme.js';
 
+// Inicializar tema inmediatamente
+ThemeService.init();
 import Navigo from 'navigo';
 import { supabase } from './data/supabase.js';
 
