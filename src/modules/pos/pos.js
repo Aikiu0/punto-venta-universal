@@ -1,4 +1,4 @@
-// src/modules/pos/pos.js - FIX: TICKET WEB DETALLADO Y SIN ERRORES
+// src/modules/pos/pos.js - VERSIÓN FINAL: CANTIDAD EDITABLE
 import { db, isDbEmpty, seedDummyData } from '../../data/db-local.js';
 import { supabase } from '../../data/supabase.js';
 import { syncService } from '../../services/sync.js';
@@ -71,7 +71,7 @@ export async function setupPOSLogic(router) {
     const btnOrders = document.getElementById('btn-web-orders');
     const badgeOrders = document.getElementById('orders-badge');
 
-    // --- 1. AUDIO ---
+    // 1. AUDIO
     function initAudio() {
         if (audioContext) return;
         try {
@@ -96,7 +96,7 @@ export async function setupPOSLogic(router) {
         } catch(e) {}
     }
 
-    // --- 2. PEDIDOS WEB ---
+    // 2. PEDIDOS
     async function checkPendingOrders() {
         const { count, error } = await supabase.from('web_orders').select('*', { count: 'exact', head: true }).eq('status', 'pendiente');
         if (!error) {
@@ -105,7 +105,7 @@ export async function setupPOSLogic(router) {
                 badgeOrders.style.display = "flex"; badgeOrders.textContent = count; btnOrders.style.backgroundColor = "#ffedd5";
                 if (count > current) { showToast("Nuevo Pedido Web"); }
             } else {
-                badgeOrders.style.display = "none"; btnOrders.style.backgroundColor = "#fff7ed";
+                badgeOrders.style.display = "none"; badgeOrders.textContent = "0"; btnOrders.style.backgroundColor = "#fff7ed";
             }
         }
     }
@@ -120,7 +120,7 @@ export async function setupPOSLogic(router) {
     }
 
     supabase.removeAllChannels();
-    const channel = supabase.channel('pos-final-fix')
+    const channel = supabase.channel('pos-fix-inputs')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'web_orders' }, (payload) => {
             if (payload.eventType === 'INSERT') showToast(payload.new.customer_name || "Web");
             checkPendingOrders();
@@ -131,7 +131,7 @@ export async function setupPOSLogic(router) {
     ordersCheckInterval = setInterval(checkPendingOrders, 10000);
     checkPendingOrders();
 
-    // --- 3. MODAL PEDIDOS ---
+    // 3. MODAL PEDIDOS
     btnOrders.addEventListener('click', openWebOrdersModal);
     async function openWebOrdersModal() {
         modal.style.display = 'flex';
@@ -156,7 +156,7 @@ export async function setupPOSLogic(router) {
                     <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>${o.customer_name}</span><span style="color:#166534;">$${o.total.toFixed(2)}</span></div>
                     <div style="font-size:0.85rem; color:#666; margin:5px 0;">Pago: <strong>${method}</strong> | 📞 ${o.customer_contact}</div>
                     <div style="background:#f9fafb; padding:10px; border-radius:5px; margin:10px 0;"><ul style="padding-left:20px; margin:0;">
-                        ${itemsReales.map(i => `<li>${i.qty} ${i.unit||'pz'} - ${i.name}</li>`).join('')}
+                        ${itemsReales.map(i => `<li>${i.qty || i.cantidad} ${i.unit||'pz'} - ${i.name}</li>`).join('')}
                     </ul></div>
                     <button class="btn-deliver-order" data-id="${o.id}" style="width:100%; padding:10px; background:#10b981; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">✅ Entregar y Cobrar</button>
                 </div>`;
@@ -167,60 +167,89 @@ export async function setupPOSLogic(router) {
         document.querySelectorAll('.btn-deliver-order').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const order = orders.find(o => o.id == e.target.dataset.id);
-                if(confirm(`¿Confirmar entrega a ${order.customer_name}?`)) { await finalizeWebOrder(order); }
+                if(confirm(`¿Confirmar entrega a ${order.customer_name}?`)) { await preFinalizeWebOrder(order); }
             });
         });
     }
 
-    async function finalizeWebOrder(order) {
+    async function preFinalizeWebOrder(order) {
+        let method = "EFECTIVO";
+        const meta = order.items.find(i => i.type === 'meta');
+        if (meta && meta.payment_method) method = meta.payment_method.toUpperCase();
+
+        if (method.includes("EFECTIVO")) { abrirModalCobroWeb(order); } 
+        else { await saveWebSale(order, order.total, 0); }
+    }
+
+    function abrirModalCobroWeb(order) {
+        modal.style.display = 'flex';
+        modalContent.innerHTML = `
+            <h2 style="color:#64748b;margin:0">Cobro Pedido Web</h2>
+            <div style="font-size:2.5rem;font-weight:800;color:#1e293b;margin-bottom:20px">$${order.total.toFixed(2)}</div>
+            <input type="number" id="web-input-received" class="pay-input-giant" placeholder="Recibido" autofocus>
+            <div style="background:#f8fafc;padding:15px;border-radius:12px;margin-bottom:20px">
+                <span style="color:#64748b">Cambio:</span><strong id="web-change-label" style="font-size:1.5rem;display:block">$0.00</strong>
+            </div>
+            <div style="display:flex;gap:10px">
+                <button id="btn-cancel-web" style="flex:1;padding:15px;border:none;background:#f1f5f9;border-radius:12px;cursor:pointer">Cancelar</button>
+                <button id="btn-confirm-web" style="flex:2;padding:15px;border:none;background:#10b981;color:white;font-weight:bold;border-radius:12px;cursor:pointer;opacity:0.5" disabled>FINALIZAR</button>
+            </div>
+        `;
+        
+        const input = document.getElementById('web-input-received');
+        const changeLabel = document.getElementById('web-change-label');
+        const btnConfirm = document.getElementById('btn-confirm-web');
+        
+        input.focus();
+        input.addEventListener('input', e => {
+            const val = parseFloat(e.target.value) || 0;
+            const diff = val - order.total;
+            changeLabel.textContent = `$${diff.toFixed(2)}`;
+            if(diff >= 0) { changeLabel.style.color = '#166534'; btnConfirm.disabled = false; btnConfirm.style.opacity = "1"; } 
+            else { changeLabel.style.color = '#dc2626'; btnConfirm.disabled = true; btnConfirm.style.opacity = "0.5"; }
+        });
+
+        btnConfirm.addEventListener('click', () => {
+            const received = parseFloat(input.value);
+            const change = received - order.total;
+            saveWebSale(order, received, change);
+        });
+
+        document.getElementById('btn-cancel-web').addEventListener('click', () => openWebOrdersModal());
+    }
+
+    async function saveWebSale(order, received, change) {
         try {
-            // 1. NORMALIZAR DATOS (Convertir 'qty' de web a 'cantidad' de POS)
-            // Esto arregla el error "undefined pz" y "NaN"
+            const { data: authData } = await supabase.auth.getUser();
+            if (!authData || !authData.user) { alert("Sesión expirada"); return; }
+
             const itemsNormalizados = order.items
                 .filter(i => i.type !== 'meta')
-                .map(i => ({
-                    ...i,
-                    cantidad: i.qty || i.cantidad, // <--- AQUÍ ESTÁ LA MAGIA DEL FIX
-                    unit: i.unit || 'pz'
-                }));
+                .map(i => ({ ...i, cantidad: Number(i.qty || i.cantidad || 1), unit: i.unit || 'pz' }));
 
             let method = "Web/Pickup";
             const meta = order.items.find(i => i.type === 'meta');
             if (meta && meta.payment_method) method = meta.payment_method.toUpperCase();
 
-            // Objeto Venta
             const venta = {
-                date: new Date(),
-                total: order.total,
-                items: itemsNormalizados,
-                payment: { method: method, received: order.total, change: 0 }
+                date: new Date(), total: order.total, items: itemsNormalizados,
+                payment: { method: method, received: received, change: change }
             };
 
-            // 2. Guardar en Historial
             await supabase.from('sales').insert({
-                created_at: new Date(),
-                total: order.total,
-                items: itemsNormalizados,
-                payment_data: { method: method, customer: order.customer_name },
-                user_id: (await supabase.auth.getUser()).data.user.id,
-                local_id: null
+                created_at: new Date(), total: order.total, items: itemsNormalizados,
+                payment_data: { method: method, customer: order.customer_name, received: received, change: change },
+                user_id: authData.user.id, local_id: null
             });
 
-            // 3. Marcar Entregado
             await supabase.from('web_orders').update({ status: 'entregado' }).eq('id', order.id);
-            
-            // 4. UI
             checkPendingOrders();
-            alert("Venta registrada. Generando ticket...");
-            mostrarTicket(venta); // Usamos la versión normalizada
+            mostrarTicket(venta);
 
-        } catch (error) {
-            console.error(error);
-            alert("Error: " + error.message);
-        }
+        } catch (error) { console.error(error); alert("Error: " + error.message); }
     }
 
-    // --- 4. LÓGICA GENERAL (IGUAL QUE ANTES) ---
+    // 4. GENERAL
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
@@ -232,12 +261,10 @@ export async function setupPOSLogic(router) {
     
     syncService.listenConnection(async (isOnline) => {
         if(isOnline) {
-            statusBadge.innerHTML = `📶 Conectado`;
-            statusBadge.style.backgroundColor = "#dcfce7"; statusBadge.style.color = "#166534";
+            statusBadge.innerHTML = `📶 Conectado`; statusBadge.style.backgroundColor = "#dcfce7"; statusBadge.style.color = "#166534";
             await syncService.uploadSales();
         } else {
-            statusBadge.innerHTML = `📡 Desconectado`;
-            statusBadge.style.backgroundColor = "#fee2e2"; statusBadge.style.color = "#991b1b";
+            statusBadge.innerHTML = `📡 Desconectado`; statusBadge.style.backgroundColor = "#fee2e2"; statusBadge.style.color = "#991b1b";
         }
     });
 
@@ -299,18 +326,65 @@ export async function setupPOSLogic(router) {
         renderCart();
     }
 
+    // --- FUNCIÓN ACTUALIZAR CANTIDAD MANUAL ---
+    function updateCartItemQty(index, newQty) {
+        if(newQty <= 0) {
+            if(confirm("¿Quitar del carrito?")) carrito.splice(index, 1);
+        } else {
+            const item = carrito[index];
+            if(newQty > item.stock) {
+                alert(`Stock insuficiente. Máximo: ${item.stock}`);
+                carrito[index].cantidad = item.stock;
+            } else {
+                carrito[index].cantidad = newQty;
+            }
+        }
+        renderCart();
+    }
+
     function removeFromCart(idx) { carrito.splice(idx, 1); renderCart(); }
 
     function renderCart() {
         cartItemsContainer.innerHTML = ''; totalVenta = 0;
         if(carrito.length===0) { cartItemsContainer.innerHTML = `<div style="text-align:center;color:#94a3b8;margin-top:50px"><div style="font-size:3rem">🛒</div><p>Vacío</p></div>`; cartTotalLabel.textContent='$0.00'; return; }
+        
         carrito.forEach((item, idx) => {
             totalVenta += item.price * item.cantidad;
+            const unit = item.unit || 'pz';
+            
+            // INPUT EDITABLE EN EL CARRITO
+            const qtyInput = `
+                <input type="number" class="qty-input-pos" data-idx="${idx}" value="${item.cantidad}" 
+                style="width:50px; padding:5px; text-align:center; border:1px solid #ddd; border-radius:4px; font-weight:bold;">
+            `;
+
             const div = document.createElement('div'); div.className = 'cart-item';
-            div.innerHTML = `<div><div style="font-weight:bold;color:#334155">${item.name}</div><div style="color:#64748b">${item.cantidad} ${item.unit||'pz'} x $${item.price}</div></div><div style="display:flex;align-items:center;gap:15px"><div style="font-weight:bold;color:#1e293b">$${(item.price*item.cantidad).toFixed(2)}</div><button class="rm-btn" data-i="${idx}" style="color:#ef4444;border:none;background:none;cursor:pointer">×</button></div>`;
+            div.innerHTML = `
+                <div>
+                    <div style="font-weight:bold;color:#334155">${item.name}</div>
+                    <div style="color:#64748b; display:flex; align-items:center; gap:5px; margin-top:5px;">
+                        ${qtyInput} <span style="font-size:0.9rem;">${unit} x $${item.price}</span>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div style="font-weight:bold;color:#1e293b">$${(item.price*item.cantidad).toFixed(2)}</div>
+                    <button class="rm-btn" data-i="${idx}" style="color:#ef4444;border:none;background:none;cursor:pointer">×</button>
+                </div>`;
             cartItemsContainer.appendChild(div);
         });
+        
         cartTotalLabel.textContent = `$${totalVenta.toFixed(2)}`;
+        
+        // Listeners para los inputs de cantidad
+        document.querySelectorAll('.qty-input-pos').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                const val = parseFloat(e.target.value);
+                updateCartItemQty(idx, val);
+            });
+            input.addEventListener('focus', (e) => e.target.select()); // Seleccionar todo al hacer clic
+        });
+
         document.querySelectorAll('.rm-btn').forEach(b => b.addEventListener('click', e => removeFromCart(e.target.dataset.i)));
     }
 
@@ -340,7 +414,6 @@ export async function setupPOSLogic(router) {
         mostrarTicket(venta); carrito=[]; renderCart();
     }
 
-    // --- 5. TICKET MEJORADO (MUESTRA DETALLES) ---
     function mostrarTicket(venta) {
         modalContent.innerHTML = `
             <div id="printable-area" style="text-align:center;font-family:'Courier New', monospace; padding:20px; background:white; max-width:350px; margin:0 auto;">
@@ -372,21 +445,14 @@ export async function setupPOSLogic(router) {
                 </div>
                 <p style="margin-top:15px; font-size:0.8rem;">¡Gracias por su compra!</p>
             </div>
-            
             <div class="no-print" style="display:flex; gap:10px; margin-top:20px;">
-                <button id="btn-print" style="flex:1; padding:10px; background:#334155; color:white; border:none; border-radius:8px; cursor:pointer;">🖨️ Imprimir</button>
-                <button id="btn-new" style="flex:1; padding:10px; background:#10b981; color:white; border:none; border-radius:8px; cursor:pointer;">Cerrar</button>
+                <button id="btn-print" style="flex:1; padding:10px; background:#334155; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">🖨️ Imprimir</button>
+                <button id="btn-new" style="flex:1; padding:10px; background:#10b981; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Cerrar</button>
             </div>
         `;
         document.getElementById('btn-print').addEventListener('click', () => window.print());
         document.getElementById('btn-new').addEventListener('click', () => { modal.style.display='none'; searchInput.focus(); });
     }
 
-    try { 
-        if(navigator.onLine) await syncService.downloadProducts(); 
-        if(await isDbEmpty()) await seedDummyData(); 
-        productosGlobal = await db.products.toArray(); 
-        renderGrid(productosGlobal);
-        checkPendingOrders(); 
-    } catch(e){console.error(e);}
+    try { if(navigator.onLine) await syncService.downloadProducts(); if(await isDbEmpty()) await seedDummyData(); productosGlobal = await db.products.toArray(); renderGrid(productosGlobal); checkPendingOrders(); } catch(e){console.error(e);}
 }

@@ -1,5 +1,7 @@
-// src/modules/admin/inventory.js - DISEÑO PROFESIONAL + LÓGICA COMPLETA
+// src/modules/admin/inventory.js - CON BUSCADOR INTELIGENTE
 import { supabase } from '../../data/supabase.js';
+
+let allProducts = []; // Memoria local para búsqueda rápida
 
 export function renderAdminInventory() {
     return `
@@ -8,6 +10,7 @@ export function renderAdminInventory() {
                 <div class="sidebar-logo">🚀 Mi Negocio</div>
                 <nav class="sidebar-menu">
                     <button class="menu-item" id="nav-dash">📊 Dashboard</button>
+                    <button class="menu-item" id="nav-orders">🔔 Pedidos Web</button>
                     <button class="menu-item active">📦 Inventario</button>
                     <button class="menu-item" id="nav-pos">🛒 Ir a Caja (POS)</button>
                     <button class="menu-item logout" id="nav-logout">🚪 Cerrar Sesión</button>
@@ -26,6 +29,12 @@ export function renderAdminInventory() {
                 </header>
 
                 <div class="card-panel">
+                    
+                    <div style="margin-bottom: 20px; display:flex; gap:10px;">
+                        <input type="text" id="inventory-search" placeholder="🔍 Buscar por nombre, código o categoría..." 
+                            style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; outline: none;">
+                    </div>
+
                     <table class="modern-table">
                         <thead>
                             <tr>
@@ -93,19 +102,18 @@ export function renderAdminInventory() {
 }
 
 export async function setupInventoryLogic(router) {
-    
-    // --- 1. NAVEGACIÓN BARRA LATERAL ---
+    // Navegación
     document.getElementById('nav-dash').addEventListener('click', () => router.navigate('/admin'));
+    document.getElementById('nav-orders').addEventListener('click', () => router.navigate('/admin/orders'));
     document.getElementById('nav-pos').addEventListener('click', () => router.navigate('/pos'));
-    document.getElementById('nav-logout').addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        router.navigate('/');
-    });
+    document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
 
-    // --- 2. REFERENCIAS DEL DOM ---
+    // Elementos
     const tableBody = document.getElementById('inventory-table-body');
     const modal = document.getElementById('product-modal');
+    const searchInput = document.getElementById('inventory-search');
     
+    // Form elements
     const pId = document.getElementById('prod-id');
     const pName = document.getElementById('prod-name');
     const pSku = document.getElementById('prod-sku');
@@ -115,36 +123,7 @@ export async function setupInventoryLogic(router) {
     const pStock = document.getElementById('prod-stock');
     const pBulk = document.getElementById('prod-bulk');
 
-    // --- 3. CARGAR CATEGORÍAS ---
-    async function loadCategories() {
-        const { data } = await supabase.from('categories').select('*').order('name');
-        if (data) {
-            const currentVal = pCat.value; 
-            pCat.innerHTML = `<option value="" disabled selected>Selecciona Categoría</option>`;
-            data.forEach(cat => {
-                const option = document.createElement('option');
-                option.value = cat.name; 
-                option.textContent = cat.name;
-                pCat.appendChild(option);
-            });
-            if(currentVal) pCat.value = currentVal;
-        }
-    }
-
-    document.getElementById('btn-new-cat').addEventListener('click', async () => {
-        const newCatName = prompt("Nombre de la nueva categoría:");
-        if (newCatName && newCatName.trim() !== "") {
-            const { error } = await supabase.from('categories').insert({ name: newCatName.trim() });
-            if (!error) {
-                await loadCategories();
-                pCat.value = newCatName.trim();
-            } else {
-                alert("Error al crear categoría (quizás ya existe)");
-            }
-        }
-    });
-
-    // --- 4. CARGAR PRODUCTOS ---
+    // --- 1. CARGAR PRODUCTOS ---
     async function loadProducts() {
         const { data, error } = await supabase.from('products').select('*').order('name');
         if (error) {
@@ -152,19 +131,20 @@ export async function setupInventoryLogic(router) {
             tableBody.innerHTML = `<tr><td colspan="7" style="color:red; text-align:center;">Error cargando datos</td></tr>`;
             return;
         }
-        renderTable(data);
+        allProducts = data; // Guardar en memoria
+        renderTable(allProducts); // Mostrar todos
     }
 
+    // --- 2. RENDERIZAR TABLA ---
     function renderTable(products) {
         tableBody.innerHTML = '';
         if(products.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#999;">No hay productos aún.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">No se encontraron productos.</td></tr>`;
             return;
         }
 
         products.forEach(p => {
             const tr = document.createElement('tr');
-            // Icono de granel si aplica
             const bulkIcon = p.is_bulk ? ' <span title="Granel">📏</span>' : '';
             
             tr.innerHTML = `
@@ -182,76 +162,90 @@ export async function setupInventoryLogic(router) {
             tableBody.appendChild(tr);
         });
 
-        // Listeners de la tabla
-        document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.id, products)));
+        document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.id)));
         document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', () => deleteProduct(b.dataset.id)));
     }
 
-    // --- 5. ABRIR MODAL (Editar/Crear) ---
-    function openEdit(id, products) {
-        const prod = products.find(p => p.id == id);
+    // --- 3. BUSCADOR EN TIEMPO REAL ---
+    searchInput.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        
+        const filtered = allProducts.filter(p => 
+            p.name.toLowerCase().includes(term) || 
+            (p.sku && p.sku.toLowerCase().includes(term)) ||
+            p.category.toLowerCase().includes(term)
+        );
+        
+        renderTable(filtered);
+    });
+
+    // --- 4. CATEGORÍAS Y MODAL ---
+    async function loadCategories() {
+        const { data } = await supabase.from('categories').select('*').order('name');
+        if (data) {
+            const currentVal = pCat.value; 
+            pCat.innerHTML = `<option value="" disabled selected>Selecciona Categoría</option>`;
+            data.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.name; option.textContent = cat.name;
+                pCat.appendChild(option);
+            });
+            if(currentVal) pCat.value = currentVal;
+        }
+    }
+
+    document.getElementById('btn-new-cat').addEventListener('click', async () => {
+        const newCatName = prompt("Nombre de la nueva categoría:");
+        if (newCatName && newCatName.trim() !== "") {
+            await supabase.from('categories').insert({ name: newCatName.trim() });
+            loadCategories(); pCat.value = newCatName.trim();
+        }
+    });
+
+    function openEdit(id) {
+        const prod = allProducts.find(p => p.id == id);
         if (prod) {
             document.getElementById('modal-title').textContent = "Editar Producto";
-            pId.value = prod.id;
-            pName.value = prod.name;
-            pSku.value = prod.sku;
-            pCat.value = prod.category;
-            pPrice.value = prod.price;
-            pStock.value = prod.stock;
-            pUnit.value = prod.unit || 'pz';
-            pBulk.checked = prod.is_bulk;
+            pId.value = prod.id; pName.value = prod.name; pSku.value = prod.sku;
+            pCat.value = prod.category; pPrice.value = prod.price; pStock.value = prod.stock;
+            pUnit.value = prod.unit || 'pz'; pBulk.checked = prod.is_bulk;
         }
         modal.style.display = 'flex';
     }
 
     document.getElementById('btn-add-product').addEventListener('click', () => {
         document.getElementById('modal-title').textContent = "Nuevo Producto";
-        pId.value = ''; 
-        pName.value = ''; pSku.value = ''; pPrice.value = ''; pStock.value = '';
+        pId.value = ''; pName.value = ''; pSku.value = ''; pPrice.value = ''; pStock.value = '';
         pCat.value = ''; pUnit.value = 'pz'; pBulk.checked = false;
         modal.style.display = 'flex';
     });
 
-    document.getElementById('btn-cancel-prod').addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
+    document.getElementById('btn-cancel-prod').addEventListener('click', () => modal.style.display = 'none');
 
-    // --- 6. GUARDAR DATOS ---
     document.getElementById('btn-save-prod').addEventListener('click', async () => {
         const productData = {
-            name: pName.value,
-            sku: pSku.value,
-            category: pCat.value,
-            unit: pUnit.value,
-            price: parseFloat(pPrice.value),
-            stock: parseFloat(pStock.value),
-            is_bulk: pBulk.checked
+            name: pName.value, sku: pSku.value, category: pCat.value, unit: pUnit.value,
+            price: parseFloat(pPrice.value), stock: parseFloat(pStock.value), is_bulk: pBulk.checked
         };
 
-        if (!productData.name || !productData.price || !productData.category) return alert("Nombre, Precio y Categoría obligatorios");
+        if (!productData.name || !productData.price || !productData.category) return alert("Datos faltantes");
 
         if (pId.value) {
-            const { error } = await supabase.from('products').update(productData).eq('id', pId.value);
-            if (error) alert("Error actualizando: " + error.message);
+            await supabase.from('products').update(productData).eq('id', pId.value);
         } else {
-            const { error } = await supabase.from('products').insert(productData);
-            if (error) alert("Error creando: " + error.message);
+            await supabase.from('products').insert(productData);
         }
-
         modal.style.display = 'none';
-        loadProducts(); // Recargar tabla
+        loadProducts();
     });
 
-    // --- 7. BORRAR ---
     async function deleteProduct(id) {
-        if (confirm("¿Estás seguro de borrar este producto?")) {
-            const { error } = await supabase.from('products').delete().eq('id', id);
-            if (!error) loadProducts();
-            else alert("No se pudo borrar: " + error.message);
+        if (confirm("¿Borrar?")) {
+            await supabase.from('products').delete().eq('id', id);
+            loadProducts();
         }
     }
 
-    // INICIAR CARGA
     loadCategories();
     loadProducts();
 }
