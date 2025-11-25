@@ -1,25 +1,33 @@
-// src/services/sync.js - VERSIÓN "FUERZA BRUTA" (Sin RPC)
+// src/services/sync.js - ESTRATEGIA "SHOP" (Uno por uno)
 import { supabase } from '../data/supabase.js';
 import { db } from '../data/db-local.js';
 
 export const syncService = {
     listenConnection(callback) {
         window.addEventListener('online', () => {
-            console.log("📶 Conexión. Sincronizando...");
+            console.log("📶 Conexión recuperada. Sincronizando...");
             this.syncAll();
             callback(true);
         });
-        window.addEventListener('offline', () => callback(false));
+        window.addEventListener('offline', () => {
+            console.log("📡 Offline");
+            callback(false);
+        });
         callback(navigator.onLine);
     },
 
     async syncAll() {
         if (!navigator.onLine) return;
+
         try {
-            await this.uploadSales();      // 1. Subir y Restar
-            await this.downloadProducts(); // 2. Bajar Stock Real
-            await this.downloadSalesHistory(); 
-            console.log("✅ Todo Sincronizado");
+            // 1. SUBIR Y RESTAR (Prioridad 1)
+            await this.uploadSales();
+            
+            // 2. BAJAR ACTUALIZACIONES (Prioridad 2)
+            await this.downloadProducts();
+            await this.downloadSalesHistory();
+            
+            console.log("✅ Sincronización completada");
         } catch (error) {
             console.error("❌ Error Sync:", error);
         }
@@ -32,59 +40,57 @@ export const syncService = {
         const businessId = localStorage.getItem('archsell_business_id');
         if (!businessId) return console.error("Falta Business ID");
 
-        console.log(`☁️ Procesando ${pendingSales.length} ventas...`);
+        console.log(`☁️ Procesando ${pendingSales.length} ventas pendientes...`);
 
         for (const sale of pendingSales) {
             try {
-                // 1. INSERTAR VENTA EN HISTORIAL
+                // A. INSERTAR VENTA EN HISTORIAL
                 const { id, sync_status, items_rpc, payment, ...restOfSale } = sale;
                 
-                const { error: insertError } = await supabase.from('sales').insert({
+                const saleToInsert = {
                     ...restOfSale,
-                    payment_data: payment, 
+                    payment_data: payment, // Corrección de nombre
                     items: sale.items,
                     business_id: businessId,
                     created_at: new Date(sale.date).toISOString()
-                });
+                };
 
+                const { error: insertError } = await supabase.from('sales').insert(saleToInsert);
                 if (insertError) throw insertError;
 
-                // 2. RESTAR STOCK (Directo desde JS, sin RPC)
-                // Usamos la lista limpia items_rpc o la calculamos
-                const itemsToUpdate = items_rpc || sale.items.map(i => ({
+                // B. RESTAR STOCK (ESTRATEGIA SHOP: UNO POR UNO)
+                // Usamos items_rpc o mapeamos al vuelo
+                const itemsToProcess = items_rpc || sale.items.map(i => ({
                     id: i.id,
                     qty: Number(i.cantidad || i.qty || 1)
                 }));
 
-                console.log("📉 Restando stock para:", itemsToUpdate);
+                console.log("📉 Restando items:", itemsToProcess);
 
-                // Bucle de actualización directa (Infalible)
-                for (const item of itemsToUpdate) {
-                    // A. Primero obtenemos el stock actual en la nube para no causar negativos
-                    const { data: currentProd } = await supabase
-                        .from('products')
-                        .select('stock')
-                        .eq('id', item.id)
-                        .single();
+                // Ejecutamos el RPC 'decrement_stock' por cada producto (Igual que shop.js)
+                const promises = itemsToProcess.map(item => {
+                    return supabase.rpc('decrement_stock', {
+                        product_id: item.id,
+                        amount: item.qty
+                    });
+                });
 
-                    if (currentProd) {
-                        const newStock = currentProd.stock - item.qty;
-                        
-                        // B. Actualizamos el producto
-                        const { error: updateError } = await supabase
-                            .from('products')
-                            .update({ stock: newStock })
-                            .eq('id', item.id);
-
-                        if (updateError) console.error("Error restando item:", item.id, updateError);
-                    }
+                // Esperamos a que todos se resten
+                const results = await Promise.all(promises);
+                
+                // Verificar si hubo errores en alguna resta
+                const errors = results.filter(r => r.error);
+                if (errors.length > 0) {
+                    console.error("Errores al restar stock:", errors);
+                    // No lanzamos error fatal para no duplicar la venta en historial,
+                    // pero queda registrado en consola.
                 }
 
-                // 3. EXITO
+                // C. ÉXITO
                 await db.sales.update(id, { sync_status: 'synced' });
 
             } catch (err) {
-                console.error("Error subiendo venta:", err);
+                console.error("Error procesando venta:", err);
             }
         }
     },
@@ -100,7 +106,7 @@ export const syncService = {
 
         if (!error && data) {
             await db.products.bulkPut(data);
-            console.log("📦 Stock Local Actualizado");
+            console.log("📦 Catálogo actualizado");
         }
     },
 
