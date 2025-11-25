@@ -1,4 +1,4 @@
-// src/modules/admin/inventory.js - OFFLINE FIRST + COSTOS
+// src/modules/admin/inventory.js - SAAS MULTI-CLIENTE + OFFLINE
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
 import { db } from '../../data/db-local.js';
@@ -122,6 +122,9 @@ export function renderAdminInventory() {
 }
 
 export async function setupInventoryLogic(router) {
+    // --- OBTENER CONTEXTO SAAS ---
+    const businessId = localStorage.getItem('archsell_business_id');
+
     document.getElementById('nav-dash').addEventListener('click', () => router.navigate('/admin'));
     document.getElementById('nav-orders').addEventListener('click', () => router.navigate('/admin/orders'));
     document.getElementById('nav-pos').addEventListener('click', () => router.navigate('/pos'));
@@ -164,7 +167,7 @@ export async function setupInventoryLogic(router) {
 
     function renderTable(products) {
         tableBody.innerHTML = '';
-        if(products.length === 0) return tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">Vacío</td></tr>`;
+        if(products.length === 0) return tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">Vacío (Crea tu primer producto)</td></tr>`;
 
         products.forEach(p => {
             const tr = document.createElement('tr');
@@ -192,7 +195,12 @@ export async function setupInventoryLogic(router) {
     });
 
     async function loadCategories() {
-        const { data } = await supabase.from('categories').select('*').order('name');
+        // Filtrar categorías solo de mi negocio
+        const { data } = await supabase.from('categories')
+            .select('*')
+            .eq('business_id', businessId) // <--- CRUCIAL
+            .order('name');
+            
         if (data) {
             const val = pCat.value;
             pCat.innerHTML = `<option value="" disabled selected>Categoría</option>`;
@@ -200,9 +208,24 @@ export async function setupInventoryLogic(router) {
             if(val) pCat.value = val;
         }
     }
+
     document.getElementById('btn-new-cat').addEventListener('click', async () => {
         const n = prompt("Nueva Categoría:");
-        if(n){ await supabase.from('categories').insert({name:n}); loadCategories(); pCat.value=n; }
+        if(n){ 
+            // AGREGAR CATEGORÍA CON BUSINESS_ID
+            const { error } = await supabase.from('categories').insert({
+                name: n, 
+                business_id: businessId // <--- CRUCIAL
+            });
+            
+            if(error) {
+                alert("Error creando categoría: " + error.message);
+                console.error(error);
+            } else {
+                loadCategories(); 
+                pCat.value=n; 
+            }
+        }
     });
 
     function openEdit(id) {
@@ -225,21 +248,45 @@ export async function setupInventoryLogic(router) {
     document.getElementById('btn-cancel-prod').addEventListener('click', () => modal.style.display = 'none');
 
     document.getElementById('btn-save-prod').addEventListener('click', async () => {
+        if (!businessId) return alert("Error crítico: No hay ID de negocio. Relogueate.");
+
         const data = {
             name: pName.value, sku: pSku.value, category: pCat.value, unit: pUnit.value,
             cost_price: parseFloat(pCost.value) || 0,
-            price: parseFloat(pPrice.value), stock: parseFloat(pStock.value), is_bulk: pBulk.checked
+            price: parseFloat(pPrice.value), stock: parseFloat(pStock.value), is_bulk: pBulk.checked,
+            business_id: businessId // <--- CRUCIAL PARA AGREGAR PRODUCTOS
         };
+        
         if(!data.name || !data.price) return alert("Faltan datos");
 
-        if(pId.value) await supabase.from('products').update(data).eq('id', pId.value);
-        else await supabase.from('products').insert(data);
+        let error = null;
+
+        if(pId.value) {
+            // Update
+            const res = await supabase.from('products').update(data).eq('id', pId.value);
+            error = res.error;
+        } else {
+            // Insert
+            const res = await supabase.from('products').insert(data);
+            error = res.error;
+        }
         
-        modal.style.display='none'; loadProducts();
+        if (error) {
+            alert("Error al guardar: " + error.message);
+            console.error(error);
+        } else {
+            modal.style.display='none'; 
+            // Recargamos local y nube
+            if(navigator.onLine) await syncService.downloadProducts();
+            loadProducts();
+        }
     });
 
     async function deleteProduct(id) {
-        if(confirm("¿Borrar?")) { await supabase.from('products').delete().eq('id', id); loadProducts(); }
+        if(confirm("¿Borrar?")) { await supabase.from('products').delete().eq('id', id); 
+            if(navigator.onLine) await syncService.downloadProducts();
+            loadProducts(); 
+        }
     }
 
     loadCategories(); loadProducts();

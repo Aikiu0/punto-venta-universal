@@ -34,7 +34,7 @@ export function setupLoginLogic(router) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        // 1. Feedback visual (Cargando...)
+        // 1. Feedback visual
         btnSubmit.textContent = "Verificando...";
         btnSubmit.disabled = true;
         errorMsg.style.display = 'none';
@@ -43,7 +43,7 @@ export function setupLoginLogic(router) {
         const password = document.getElementById('password').value;
 
         try {
-            // 2. Preguntar a Supabase
+            // 2. Autenticación Auth
             const { data, error } = await supabase.auth.signInWithPassword({
                 email: email,
                 password: password,
@@ -51,19 +51,23 @@ export function setupLoginLogic(router) {
 
             if (error) throw error;
 
-            // 3. Si login es correcto, obtener el ROL de la tabla profiles
+            // 3. Obtener ROL y BUSINESS_ID (CRÍTICO PARA SAAS)
             const user = data.user;
             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('role, business_id') // <--- AQUÍ PEDIMOS EL ID DEL NEGOCIO
                 .eq('id', user.id)
                 .single();
 
             if (profileError) throw profileError;
 
-            // 4. Redirigir según el rol
-            console.log("Login exitoso. Rol:", profile.role);
+            // 4. Guardar credenciales en el navegador
+            localStorage.setItem('archsell_business_id', profile.business_id);
+            localStorage.setItem('archsell_role', profile.role);
+
+            console.log("Login exitoso. Negocio ID:", profile.business_id);
             
+            // 5. Redirigir
             if (profile.role === 'admin') {
                 router.navigate('/admin');
             } else {
@@ -71,10 +75,13 @@ export function setupLoginLogic(router) {
             }
 
         } catch (error) {
-            // Manejo de errores
             btnSubmit.textContent = "Iniciar Sesión";
             btnSubmit.disabled = false;
-            errorMsg.textContent = "Error: Usuario o contraseña incorrectos.";
+            
+            let mensaje = "Error: Usuario o contraseña incorrectos.";
+            if (error.message.includes("profile")) mensaje = "Error crítico: Usuario sin perfil de negocio asignado.";
+            
+            errorMsg.textContent = mensaje;
             errorMsg.style.display = 'block';
             console.error(error);
         }
