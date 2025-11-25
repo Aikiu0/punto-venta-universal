@@ -1,13 +1,15 @@
-// src/modules/shop/shop.js - TIENDA DINÁMICA CON SETTINGS
+// src/modules/shop/shop.js - TIENDA DINÁMICA MULTI-TENANT (FIXED)
 import { supabase } from '../../data/supabase.js';
-import { SettingsService } from '../../services/settings.js'; // <--- IMPORTANTE
+import { SettingsService } from '../../services/settings.js';
+
+// ID DEL NEGOCIO DEMO (Para que la tienda sepa a quién comprarle)
+const DEMO_BUSINESS_ID = '00000000-0000-0000-0000-000000000001';
 
 // Estado del Carrito y Productos
 let shopCart = [];
 let shopProducts = [];
 
 export function renderShop() {
-    // 1. Obtener configuración actual
     const s = SettingsService.get();
 
     return `
@@ -21,7 +23,6 @@ export function renderShop() {
                 </div>
 
                 <nav class="shop-nav">
-                    
                     <button id="btn-open-cart" class="btn-cart-float" style="border:none; cursor:pointer;">
                         🛒 <span id="cart-count">0</span>
                     </button>
@@ -84,8 +85,12 @@ export async function setupShopLogic(router) {
 
     // --- 1. CARGAR DATOS ---
     async function loadData() {
-        // Categorías
-        const { data: cats } = await supabase.from('categories').select('*');
+        // Categorías (Filtradas por negocio)
+        const { data: cats } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('business_id', DEMO_BUSINESS_ID); // <--- FIX
+
         if (cats) {
             catList.innerHTML = `<li class="category-item active" data-cat="all">Todas</li>`;
             cats.forEach(c => {
@@ -98,8 +103,13 @@ export async function setupShopLogic(router) {
             catList.querySelector('[data-cat="all"]').addEventListener('click', (e) => filterProducts('all', e.target));
         }
 
-        // Productos (Solo con stock positivo)
-        const { data: prods } = await supabase.from('products').select('*').gt('stock', 0);
+        // Productos (Solo con stock positivo y del negocio correcto)
+        const { data: prods } = await supabase
+            .from('products')
+            .select('*')
+            .eq('business_id', DEMO_BUSINESS_ID) // <--- FIX
+            .gt('stock', 0);
+            
         if (prods) {
             shopProducts = prods;
             renderProducts(shopProducts);
@@ -171,7 +181,6 @@ export async function setupShopLogic(router) {
 
         if (existing) {
             existing.qty += cantidad;
-            // Redondeo para evitar errores de decimales flotantes
             existing.qty = Math.round(existing.qty * 1000) / 1000;
         } else {
             shopCart.push({ ...p, qty: cantidad });
@@ -191,7 +200,6 @@ export async function setupShopLogic(router) {
         document.getElementById('cart-count').textContent = count;
     }
 
-    // --- FUNCIÓN PARA MODIFICAR CANTIDAD (+ / -) ---
     function updateItemQty(index, newQty) {
         if (newQty <= 0) {
             if(confirm("¿Quitar producto del carrito?")) shopCart.splice(index, 1);
@@ -199,7 +207,6 @@ export async function setupShopLogic(router) {
             const item = shopCart[index];
             if (newQty > item.stock) {
                 alert(`⚠️ Stock insuficiente. Máximo: ${item.stock}`);
-                // Regresamos al máximo posible
                 shopCart[index].qty = item.stock;
             } else {
                 shopCart[index].qty = parseFloat(newQty.toFixed(3));
@@ -226,10 +233,8 @@ export async function setupShopLogic(router) {
             const unit = item.unit || 'pz';
             const isBulk = item.is_bulk;
 
-            // Generar controles según tipo de producto
             let qtyControl = '';
             if (isBulk) {
-                // Input numérico para granel
                 qtyControl = `
                     <div style="display:flex; align-items:center; gap:5px;">
                         <input type="number" class="qty-input-bulk" data-idx="${idx}" value="${item.qty}" step="0.1" min="0.1" style="width:60px; padding:5px; text-align:center; border:1px solid #ddd; border-radius:4px;">
@@ -237,7 +242,6 @@ export async function setupShopLogic(router) {
                     </div>
                 `;
             } else {
-                // Botones +/- para piezas
                 qtyControl = `
                     <div style="display:flex; align-items:center; border:1px solid #ddd; border-radius:4px; overflow:hidden;">
                         <button class="btn-qty-change" data-idx="${idx}" data-change="-1" style="padding:5px 10px; border:none; background:#f8f9fa; cursor:pointer;">-</button>
@@ -290,9 +294,7 @@ export async function setupShopLogic(router) {
             </div>
         `;
 
-        // --- LISTENERS INTERNOS DEL CARRITO ---
-        
-        // 1. Botones +/-
+        // Listeners
         document.querySelectorAll('.btn-qty-change').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const idx = parseInt(e.target.dataset.idx);
@@ -301,7 +303,6 @@ export async function setupShopLogic(router) {
             });
         });
 
-        // 2. Input Manual
         document.querySelectorAll('.qty-input-bulk').forEach(input => {
             input.addEventListener('change', (e) => {
                 const idx = parseInt(e.target.dataset.idx);
@@ -310,7 +311,6 @@ export async function setupShopLogic(router) {
             });
         });
 
-        // 3. Borrar Item
         document.querySelectorAll('.btn-remove-item').forEach(b => {
             b.addEventListener('click', (e) => {
                 shopCart.splice(e.target.dataset.idx, 1);
@@ -319,11 +319,10 @@ export async function setupShopLogic(router) {
             });
         });
 
-        // 4. Confirmar Pedido
         document.getElementById('btn-checkout').addEventListener('click', submitOrder);
     }
 
-    // --- 3. ENVIAR PEDIDO ---
+    // --- 3. ENVIAR PEDIDO (FIXED RPC & BUSINESS_ID) ---
     async function submitOrder() {
         const name = document.getElementById('client-name').value;
         const phone = document.getElementById('client-phone').value;
@@ -336,29 +335,43 @@ export async function setupShopLogic(router) {
         btn.disabled = true;
 
         const total = shopCart.reduce((acc, i) => acc + (i.price * i.qty), 0);
-        const itemsToSave = [...shopCart, { type: 'meta', payment_method: method }];
+        
+        // Preparar items limpios para guardar en JSONB
+        const itemsToSave = [...shopCart.map(i => ({
+            id: i.id,
+            name: i.name,
+            qty: i.qty,
+            unit: i.unit,
+            price: i.price
+        })), { type: 'meta', payment_method: method }];
+
+        // Preparar items limpios para el RPC (Stock)
+        const itemsForRpc = shopCart.map(item => ({
+            id: item.id,
+            qty: item.qty
+        }));
 
         const orderData = {
             customer_name: name,
             customer_contact: phone,
             items: itemsToSave,
             total: total,
-            status: 'pendiente'
+            status: 'pendiente',
+            business_id: DEMO_BUSINESS_ID // <--- FIX CRÍTICO: ID DEL NEGOCIO
         };
 
         try {
             // A. Insertar Pedido
-            const { error } = await supabase.from('web_orders').insert(orderData);
-            if (error) throw error;
+            const { error: orderError } = await supabase.from('web_orders').insert(orderData);
+            if (orderError) throw orderError;
 
-            // B. Restar Stock (RPC)
-            const updatePromises = shopCart.map(item => {
-                return supabase.rpc('decrement_stock', { 
-                    product_id: item.id, 
-                    amount: item.qty 
-                });
+            // B. Restar Stock (RPC Nuevo) - Una sola llamada eficiente
+            const { error: rpcError } = await supabase.rpc('process_sale_inventory', { 
+                p_business_id: DEMO_BUSINESS_ID,
+                p_items: itemsForRpc
             });
-            await Promise.all(updatePromises);
+
+            if (rpcError) throw rpcError;
 
             // C. Refrescar visualmente el stock en la tienda
             await loadData(); 
@@ -394,6 +407,7 @@ export async function setupShopLogic(router) {
 
     // --- EVENTOS GENERALES ---
     document.getElementById('btn-open-cart').addEventListener('click', () => {
+        if(shopCart.length === 0) return alert("Tu carrito está vacío");
         cartOverlay.style.display = 'flex';
         renderCartDrawer();
     });

@@ -1,4 +1,4 @@
-// src/services/sync.js - CORREGIDO (Traducción cantidad -> qty)
+// src/services/sync.js - CORRECCIÓN DE NOMBRES DE COLUMNA
 import { supabase } from '../data/supabase.js';
 import { db } from '../data/db-local.js';
 
@@ -44,38 +44,44 @@ export const syncService = {
 
         for (const sale of pendingSales) {
             try {
-                // A. Preparar datos para tabla historial
-                const { id, sync_status, ...saleData } = sale;
+                // --- CORRECCIÓN AQUÍ: LIMPIEZA Y MAPEO DE DATOS ---
+                // Quitamos lo que no va a la BD y renombramos 'payment' a 'payment_data'
+                const { id, sync_status, items_rpc, payment, ...restOfSale } = sale;
 
-                // B. Insertar en tabla 'sales'
-                const { error: insertError } = await supabase.from('sales').insert({
-                    ...saleData,
+                const saleToInsert = {
+                    ...restOfSale,
+                    payment_data: payment, // <--- AQUÍ ESTABA EL ERROR 400
+                    items: sale.items,     // Items visuales
                     business_id: businessId,
                     created_at: new Date(sale.date).toISOString()
-                });
+                };
 
-                if (insertError) throw insertError;
+                // B. Insertar en tabla 'sales'
+                const { error: insertError } = await supabase.from('sales').insert(saleToInsert);
 
-                // 🔴 CAMBIO CLAVE AQUÍ: TRADUCCIÓN DE VARIABLES
-                // Convertimos 'cantidad' (JS) a 'qty' (SQL)
+                if (insertError) {
+                    console.error("Error insertando venta en Supabase:", insertError);
+                    throw insertError;
+                }
+
+                // C. Ejecutar RPC para restar stock (Tolerante a qty/cantidad)
                 const itemsParaRPC = sale.items.map(item => ({
                     id: item.id,
-                    qty: Number(item.cantidad || item.qty || 1) // <--- ESTO ARREGLA EL BUG
+                    qty: Number(item.cantidad || item.qty || 1)
                 }));
 
-                // C. Ejecutar RPC para restar stock
                 const { error: rpcError } = await supabase.rpc('process_sale_inventory', {
                     p_business_id: businessId,
-                    p_items: itemsParaRPC // Enviamos la lista traducida
+                    p_items: itemsParaRPC
                 });
 
                 if (rpcError) throw rpcError;
 
-                // D. Éxito
+                // D. Éxito: Actualizar Dexie
                 await db.sales.update(id, { sync_status: 'synced' });
 
             } catch (err) {
-                console.error("Error subiendo venta:", err);
+                console.error("Error procesando venta ID:", sale.id, err);
             }
         }
     },
@@ -84,6 +90,7 @@ export const syncService = {
         const businessId = localStorage.getItem('archsell_business_id');
         if (!businessId) return;
 
+        // Descargamos productos del negocio
         const { data, error } = await supabase
             .from('products')
             .select('*')
@@ -106,11 +113,14 @@ export const syncService = {
             .limit(50);
         
         if (data) {
+            // Mapear de vuelta payment_data -> payment para que el POS lo entienda
             const salesFormatted = data.map(s => ({
                 ...s,
+                payment: s.payment_data, // <--- Mapeo inverso para lectura
                 date: new Date(s.created_at),
                 sync_status: 'synced'
             }));
+            
             await db.transaction('rw', db.sales, async () => {
                 await db.sales.bulkPut(salesFormatted);
             });
