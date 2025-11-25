@@ -17,6 +17,7 @@ export function renderAdminSettings() {
                     <button class="menu-item" id="nav-orders">🔔 Pedidos Web</button>
                     <button class="menu-item" id="nav-inventory">📦 Inventario</button>
                     <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
+                    <button class="menu-item" id="nav-history">📅 Historial</button>
                     <button class="menu-item active">⚙️ Configuración</button>
                     <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
                 </nav>
@@ -68,6 +69,7 @@ export function setupSettingsLogic(router) {
     document.getElementById('nav-orders').addEventListener('click', () => navTo('/admin/orders'));
     document.getElementById('nav-inventory').addEventListener('click', () => navTo('/admin/inventory'));
     document.getElementById('nav-pos').addEventListener('click', () => navTo('/pos'));
+    document.getElementById('nav-history').addEventListener('click', () => navTo('/admin/history'));
     document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
 
     const btnTheme = document.getElementById('btn-toggle-theme');

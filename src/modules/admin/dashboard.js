@@ -20,6 +20,7 @@ export function renderDashboard() {
                     <button class="menu-item" id="nav-orders">🔔 Pedidos Web</button>
                     <button class="menu-item" id="nav-inventory">📦 Inventario</button>
                     <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
+                    <button class="menu-item" id="nav-history">📅 Historial</button>
                     <button class="menu-item" id="nav-settings">⚙️ Configuración</button>
                     <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
                 </nav>
@@ -104,6 +105,7 @@ export async function setupDashboardLogic(router) {
     document.getElementById('nav-pos').addEventListener('click', () => navTo('/pos'));
     document.getElementById('nav-settings').addEventListener('click', () => navTo('/admin/settings'));
     document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
+    document.getElementById('nav-history').addEventListener('click', () => navTo('/admin/history'));
     document.getElementById('theme-toggle-dash').addEventListener('click', () => ThemeService.toggle());
 
     // --- LÓGICA HÍBRIDA (OFFLINE + ONLINE) ---

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pos-v1-network-first';
+const CACHE_NAME = 'pos-v2-archsell-logo';
 const ASSETS = [
   '/',
   '/index.html',

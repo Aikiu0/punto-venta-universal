@@ -10,6 +10,7 @@ import { supabase } from './data/supabase.js';
 import { ThemeService } from './services/theme.js';
 import { SettingsService } from './services/settings.js';
 import { PwaService } from './services/pwa.js'; // Importamos PWA
+import { renderHistory, setupHistoryLogic } from './modules/admin/history.js'; // <--- NUEVO
 
 // Módulos
 import { renderLogin, setupLoginLogic } from './modules/auth/login.js';
@@ -47,6 +48,7 @@ router
     .on('/shop', () => { 
         setContent(renderShop()); 
         setupShopLogic(router); 
+        SettingsService.applyToDOM();
     })
     
     .on('/pos', async () => {
@@ -88,5 +90,11 @@ router
         setupSettingsLogic(router); 
         SettingsService.applyToDOM();
     })
-
+    .on('/admin/history', async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { router.navigate('/'); return; }
+        setContent(renderHistory());
+        setupHistoryLogic(router);
+        SettingsService.applyToDOM();
+    })
     .resolve();

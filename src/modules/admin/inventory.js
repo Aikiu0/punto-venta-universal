@@ -18,9 +18,10 @@ export function renderAdminInventory() {
                     <button class="menu-item" id="nav-dash">📊 Dashboard</button>
                     <button class="menu-item" id="nav-orders">🔔 Pedidos Web</button>
                     <button class="menu-item active">📦 Inventario</button>
-                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja (POS)</button>
+                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja </button>
+                    <button class="menu-item" id="nav-history">📅 Historial</button>
                     <button class="menu-item" id="nav-settings">⚙️ Configuración</button>
-                    <button class="menu-item logout" id="nav-logout">🚪 Cerrar Sesión</button>
+                    <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
                 </nav>
             </aside>
 
@@ -125,8 +126,10 @@ export async function setupInventoryLogic(router) {
     document.getElementById('nav-orders').addEventListener('click', () => router.navigate('/admin/orders'));
     document.getElementById('nav-pos').addEventListener('click', () => router.navigate('/pos'));
     document.getElementById('nav-settings').addEventListener('click', () => router.navigate('/admin/settings'));
+    document.getElementById('nav-history').addEventListener('click', () => navTo('/admin/history'));
     document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
     document.getElementById('theme-toggle-inv').addEventListener('click', () => ThemeService.toggle());
+    
 
     const tableBody = document.getElementById('inventory-table-body');
     const modal = document.getElementById('product-modal');

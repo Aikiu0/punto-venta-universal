@@ -1,17 +1,27 @@
-// src/modules/shop/shop.js - VERSIÓN CORREGIDA Y FUNCIONAL
+// src/modules/shop/shop.js - TIENDA DINÁMICA CON SETTINGS
 import { supabase } from '../../data/supabase.js';
+import { SettingsService } from '../../services/settings.js'; // <--- IMPORTANTE
 
 // Estado del Carrito y Productos
 let shopCart = [];
 let shopProducts = [];
 
 export function renderShop() {
+    // 1. Obtener configuración actual
+    const s = SettingsService.get();
+
     return `
         <div class="shop-layout">
-            <header class="shop-header">
-                <a href="#/shop" class="brand-logo">🔩 FerreOnline</a>
+            <header class="shop-header" style="display: flex; align-items: center; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-grow: 1;">
+                    <img src="${s.logo_url}" class="app-logo-img" style="height: 40px; width: auto; display: ${s.logo_url ? 'block' : 'none'}; border-radius: 5px;">
+                    <a href="#/shop" class="brand-logo app-name" style="text-decoration: none; color: inherit; font-weight: bold; font-size: 1.2rem;">
+                        ${s.store_name || 'Mi Tienda'}
+                    </a>
+                </div>
+
                 <nav class="shop-nav">
-                    <a href="#/" class="btn-admin-link">Soy Empleado</a>
+                    
                     <button id="btn-open-cart" class="btn-cart-float" style="border:none; cursor:pointer;">
                         🛒 <span id="cart-count">0</span>
                     </button>
@@ -47,7 +57,7 @@ export function renderShop() {
                     </div>
                     
                     <div class="drawer-body" id="cart-body">
-                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -55,6 +65,17 @@ export function renderShop() {
 }
 
 export async function setupShopLogic(router) {
+    const s = SettingsService.get();
+    const logoEl = document.querySelector('.shop-header .app-logo-img');
+    const nameEl = document.querySelector('.shop-header .app-name');
+    
+    if (s.logo_url && logoEl) {
+        logoEl.src = s.logo_url;
+        logoEl.style.display = 'block';
+    }
+    if (s.store_name && nameEl) {
+        nameEl.textContent = s.store_name;
+    }
     const grid = document.getElementById('shop-grid');
     const catList = document.getElementById('shop-categories');
     const cartCount = document.getElementById('cart-count');
