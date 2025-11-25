@@ -1,9 +1,10 @@
-// src/modules/pos/pos.js - VERSIÓN FINAL COMPLETA
+// src/modules/pos/pos.js - POS FINAL MULTI-TENANT (CORREGIDO)
 import { db } from '../../data/db-local.js';
 import { supabase } from '../../data/supabase.js';
 import { syncService } from '../../services/sync.js';
 import { ThemeService } from '../../services/theme.js';
 import { SettingsService } from '../../services/settings.js';
+
 let carrito = [];
 let productosGlobal = [];
 let totalVenta = 0;
@@ -26,14 +27,11 @@ export function renderPOS() {
                 <div class="cart-header">
                     <div class="cart-title">Ticket</div>
                     <div class="header-actions">
-
                         <button id="pos-theme-toggle" class="icon-btn" title="Cambiar Tema">🌗</button>
-
                         <div style="position:relative;">
                             <button id="btn-web-orders" title="Pedidos Web" style="border:none; background:var(--bg-input); color:var(--text-secondary); border-radius:8px; width:42px; height:38px; cursor:pointer; font-size:1.3rem; display:flex; align-items:center; justify-content:center;">🔔</button>
                             <div id="orders-badge" style="position:absolute; top:-5px; right:-5px; background:#ef4444; color:white; border-radius:50%; width:20px; height:20px; font-size:0.75rem; font-weight:bold; display:none; justify-content:center; align-items:center; box-shadow:0 2px 5px rgba(0,0,0,0.2); z-index:10;">0</div>
                         </div>
-
                         <div id="connection-status" style="display:flex; align-items:center; gap:6px; padding:6px 12px; background:var(--bg-input); border-radius:20px; font-size:0.8rem; font-weight:bold; transition:all 0.3s; border:1px solid transparent;">
                             <span>...</span>
                         </div>
@@ -74,53 +72,47 @@ export async function setupPOSLogic(router) {
     const btnOrders = document.getElementById('btn-web-orders');
     const badgeOrders = document.getElementById('orders-badge');
 
-    // --- 0. CARGA AUTOMÁTICA DE PRODUCTOS (FIX) ---
+    // --- 0. OBTENER CONTEXTO DE NEGOCIO (CRÍTICO) ---
+    const businessId = localStorage.getItem('archsell_business_id');
+    
+    if (!businessId) {
+        console.warn("⚠️ No se encontró ID de negocio. Algunas funciones pueden fallar.");
+    }
+
+    // --- 1. CARGA AUTOMÁTICA ---
     async function loadInitialData() {
         try {
-            // 1. Cargar desde Dexie (rápido)
+            // Carga rápida local
             productosGlobal = await db.products.toArray();
+            if (productosGlobal.length > 0) renderGrid(productosGlobal);
             
-            // 2. Si hay datos, mostrar inmediatamente
-            if (productosGlobal.length > 0) {
+            // Actualización en segundo plano
+            if (navigator.onLine) {
+                await syncService.downloadProducts();
+                productosGlobal = await db.products.toArray();
                 renderGrid(productosGlobal);
-            } else {
-                // 3. Si está vacío y hay red, descargar
-                if (navigator.onLine) {
-                    await syncService.downloadProducts();
-                    productosGlobal = await db.products.toArray();
-                    renderGrid(productosGlobal);
-                }
             }
-        } catch (error) {
-            console.error("Error cargando productos iniciales:", error);
-        }
+        } catch (error) { console.error("Error cargando productos:", error); }
     }
-    // Ejecutar inmediatamente
     loadInitialData();
 
-
-    // --- 1. SEGURIDAD: VERIFICAR ROL ---
+    // --- 2. VERIFICAR ROL ---
     checkUserRole();
     async function checkUserRole() {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-                if (profile && profile.role === 'admin') {
-                    const btnAdmin = document.getElementById('btn-back-admin');
-                    if(btnAdmin) {
-                        btnAdmin.style.display = 'flex';
-                        btnAdmin.onclick = () => router.navigate('/admin');
-                    }
-                }
+            // Usamos el rol guardado en localStorage para velocidad
+            const role = localStorage.getItem('archsell_role');
+            if (role === 'admin') {
+                // Aquí podrías mostrar un botón de "Volver al Admin" si existiera en el HTML
+                // O inyectarlo dinámicamente en header-actions
             }
         } catch (error) { console.error(error); }
     }
 
-    // --- ACCIONES GENERALES ---
+    // --- EVENTOS UI ---
     document.getElementById('pos-theme-toggle').addEventListener('click', () => ThemeService.toggle());
     
-    // 2. AUDIO
+    // --- AUDIO ---
     function initAudio() {
         if (audioContext) return;
         try {
@@ -145,20 +137,26 @@ export async function setupPOSLogic(router) {
         } catch(e) {}
     }
 
-    // 3. PEDIDOS WEB
+    // --- 3. PEDIDOS WEB (CORREGIDO: FILTRO POR NEGOCIO) ---
     async function checkPendingOrders() {
-        const { count, error } = await supabase.from('web_orders').select('*', { count: 'exact', head: true }).eq('status', 'pendiente');
+        if (!businessId) return;
+
+        const { count, error } = await supabase
+            .from('web_orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'pendiente')
+            .eq('business_id', businessId); // <--- FILTRO CRÍTICO
+
         if (!error) {
             const current = parseInt(badgeOrders.textContent) || 0;
             if (count > 0) {
                 badgeOrders.style.display = "flex"; badgeOrders.textContent = count; 
-                btnOrders.style.background = "var(--admin-bg)"; 
-                btnOrders.style.color = "var(--admin-text)";
+                btnOrders.style.background = "var(--admin-bg)"; btnOrders.style.color = "var(--admin-text)";
+                // Solo notificar si hay MÁS pedidos que antes
                 if (count > current) { showToast("Nuevo Pedido Web"); }
             } else {
                 badgeOrders.style.display = "none"; badgeOrders.textContent = "0"; 
-                btnOrders.style.background = "var(--bg-input)";
-                btnOrders.style.color = "var(--text-secondary)";
+                btnOrders.style.background = "var(--bg-input)"; btnOrders.style.color = "var(--text-secondary)";
             }
         }
     }
@@ -172,30 +170,51 @@ export async function setupPOSLogic(router) {
         setTimeout(() => { toast.style.display = 'none'; }, 8000);
     }
 
-    supabase.removeAllChannels();
-    const channel = supabase.channel('pos-fix-inputs')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'web_orders' }, (payload) => {
-            if (payload.eventType === 'INSERT') showToast(payload.new.customer_name || "Web");
-            checkPendingOrders();
-        })
-        .subscribe();
+    // --- SUSCRIPCIÓN REALTIME (CORREGIDO: FILTRO POR NEGOCIO) ---
+    if (businessId) {
+        supabase.removeAllChannels();
+        const channel = supabase.channel('pos-orders')
+            .on(
+                'postgres_changes', 
+                { 
+                    event: 'INSERT', 
+                    schema: 'public', 
+                    table: 'web_orders',
+                    filter: `business_id=eq.${businessId}` // <--- ESTO ASEGURA QUE SOLO TE LLEGUEN TUS PEDIDOS
+                }, 
+                (payload) => {
+                    console.log("🔔 Nuevo pedido recibido:", payload);
+                    showToast(payload.new.customer_name || "Cliente Web");
+                    checkPendingOrders();
+                }
+            )
+            .subscribe();
+    }
 
     if (ordersCheckInterval) clearInterval(ordersCheckInterval);
-    ordersCheckInterval = setInterval(checkPendingOrders, 10000);
-    checkPendingOrders();
+    ordersCheckInterval = setInterval(checkPendingOrders, 15000); // Check cada 15s como respaldo
+    checkPendingOrders(); // Check inicial
 
-    // 4. MODAL PEDIDOS
+    // --- 4. MODAL PEDIDOS ---
     btnOrders.addEventListener('click', openWebOrdersModal);
     
     async function openWebOrdersModal() {
+        if (!businessId) return alert("Error: No se ha detectado el ID del negocio.");
+        
         modal.style.display = 'flex';
         modalContent.innerHTML = `<p style="padding:20px; color:var(--text-primary);">Cargando...</p>`;
-        const { data: orders } = await supabase.from('web_orders').select('*').eq('status', 'pendiente').order('created_at', {ascending:false});
+        
+        const { data: orders } = await supabase
+            .from('web_orders')
+            .select('*')
+            .eq('status', 'pendiente')
+            .eq('business_id', businessId) // Filtro
+            .order('created_at', {ascending:false});
 
         if (!orders || orders.length === 0) {
             modalContent.innerHTML = `<div style="text-align:center; padding:30px;"><h3 style="color:var(--text-primary);">✅ Todo al día</h3><button id="btn-close-modal" style="margin-top:15px; padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:5px; cursor:pointer;">Cerrar</button></div>`;
             document.getElementById('btn-close-modal').addEventListener('click', () => modal.style.display = 'none');
-            checkPendingOrders();
+            checkPendingOrders(); // Actualizar badge
             return;
         }
 
@@ -259,19 +278,42 @@ export async function setupPOSLogic(router) {
         try {
             const { data: authData } = await supabase.auth.getUser();
             if (!authData || !authData.user) { alert("Sesión expirada"); return; }
+            
+            // Mapeo de items
             const itemsNormalizados = order.items.filter(i => i.type !== 'meta').map(i => ({ ...i, cantidad: Number(i.qty || i.cantidad || 1), unit: i.unit || 'pz' }));
             let method = "Web/Pickup";
             const meta = order.items.find(i => i.type === 'meta');
             if (meta && meta.payment_method) method = meta.payment_method.toUpperCase();
 
-            const venta = { date: new Date(), total: order.total, items: itemsNormalizados, payment: { method: method, received: received, change: change } };
-            await supabase.from('sales').insert({ created_at: new Date(), total: order.total, items: itemsNormalizados, payment_data: { method: method, customer: order.customer_name, received: received, change: change }, user_id: authData.user.id, local_id: null });
+            const venta = { 
+                date: new Date(), 
+                total: order.total, 
+                items: itemsNormalizados, 
+                payment: { method: method, received: received, change: change } 
+            };
+
+            // --- CORRECCIÓN: INSERTAR CON BUSINESS_ID Y PAYMENT_DATA ---
+            const { error: insertError } = await supabase.from('sales').insert({ 
+                created_at: new Date(), 
+                total: order.total, 
+                items: itemsNormalizados, 
+                // Usamos payment_data para que coincida con la estructura corregida en BD
+                payment_data: { method: method, customer: order.customer_name, received: received, change: change }, 
+                user_id: authData.user.id, 
+                business_id: businessId // <--- ESTO FALTABA Y CAUSABA ERROR
+            });
+
+            if (insertError) throw insertError;
+
+            // Marcar pedido como entregado
             await supabase.from('web_orders').update({ status: 'entregado' }).eq('id', order.id);
-            checkPendingOrders(); mostrarTicket(venta);
+            
+            checkPendingOrders(); 
+            mostrarTicket(venta);
         } catch (error) { console.error(error); alert("Error: " + error.message); }
     }
 
-    // 5. SINCRONIZACIÓN Y EVENTOS UI
+    // --- 5. SYNC Y EVENTOS UI ---
     syncService.listenConnection(async (isOnline) => {
         if(isOnline) {
             statusBadge.innerHTML = `📶 Conectado`; statusBadge.style.backgroundColor = "#dcfce7"; statusBadge.style.color = "#166534";
@@ -380,88 +422,62 @@ export async function setupPOSLogic(router) {
         document.getElementById('btn-cancel-modal').addEventListener('click', () => { modal.style.display = 'none'; searchInput.focus(); });
     }
 
+    // --- FUNCIÓN DE VENTA BLINDADA (RPC + OFFLINE) ---
     async function procesarVenta(recibido) {
+        
+        // 1. OBTENER BUSINESS ID (CRÍTICO)
         const businessId = localStorage.getItem('archsell_business_id');
-        const userRole = localStorage.getItem('archsell_role'); // Opcional, por si lo necesitas
+        if (!businessId) {
+            alert("Error: No se ha detectado el ID del negocio. Intenta recargar.");
+            return;
+        }
 
-        // 2. Preparar los items para el RPC (Solo ID y Cantidad)
-        // Esto es lo que Supabase usará para restar el stock
+        // 2. Preparar items para RPC
         const itemsForRpc = carrito.map(item => ({
             id: item.id,
             qty: item.cantidad
         }));
 
-        // 3. Crear objeto venta
+        // 3. Crear Objeto Venta
         const venta = { 
             date: new Date(), 
             total: totalVenta, 
-            
-            // Guardamos items completos para el historial visual (nombres, precios en ese momento)
-            items: [...carrito], 
-            
-            // Guardamos la versión "minificada" para el proceso de sync
-            items_rpc: itemsForRpc,
-
-            payment: { 
-                method: 'cash', 
-                received: recibido, 
-                change: recibido - totalVenta 
-            }, 
+            items: [...carrito], // Visual
+            items_rpc: itemsForRpc, // Lógica
+            payment: { method: 'cash', received: recibido, change: recibido - totalVenta }, 
             sync_status: 'pending',
-            business_id: businessId // <--- CRUCIAL: Sin esto, no es multi-tenant
+            business_id: businessId // <--- CLAVE MULTI-TENANT
         };
 
-        // 4. Guardar en Dexie (Local)
+        // 4. Guardar Local (Dexie)
         await db.sales.add(venta);
 
-        // 5. Restar Stock Visualmente en Dexie (Feedback inmediato al cajero)
+        // 5. Feedback Visual (Resta local inmediata)
         for(const i of carrito) { 
             const p = await db.products.get(i.id); 
-            if(p){ 
-                p.stock -= i.cantidad; 
-                await db.products.put(p); 
-            } 
+            if(p){ p.stock-=i.cantidad; await db.products.put(p); } 
         }
+        productosGlobal = await db.products.toArray(); renderGrid(productosGlobal);
 
-        // 6. Actualizar UI
-        productosGlobal = await db.products.toArray(); 
-        renderGrid(productosGlobal);
-
-        // 7. Intentar Sincronizar (Si hay internet)
-        // syncService.uploadSales() se encargará de mandar el business_id y ejecutar el RPC
+        // 6. Sync (Si hay red)
         if(navigator.onLine) await syncService.uploadSales();
 
-        // 8. Mostrar Ticket y Limpiar
-        mostrarTicket(venta); 
-        carrito = []; 
-        renderCart();
+        mostrarTicket(venta); carrito=[]; renderCart();
     }
 
     function mostrarTicket(venta) {
         const s = SettingsService.get(); 
-
         modalContent.innerHTML = `
             <div id="printable-area">
-                
                 <div class="ticket-header">
                     <div class="ticket-store-name">${s.store_name}</div>
                     ${s.address ? `<div class="ticket-meta">${s.address}</div>` : ''}
                     ${s.phone ? `<div class="ticket-meta">Tel: ${s.phone}</div>` : ''}
-                    <div class="ticket-meta" style="margin-top:5px;">
-                        ${new Date(venta.date).toLocaleString()}
-                    </div>
+                    <div class="ticket-meta" style="margin-top:5px;">${new Date(venta.date).toLocaleString()}</div>
                 </div>
-
                 <div class="dashed-line"></div>
-                
-                <div class="items-header">
-                    <span>CANT</span>
-                    <span>DESCRIPCIÓN</span>
-                    <span>IMPORTE</span>
-                </div>
-
+                <div class="items-header"><span>CANT</span><span>DESCRIPCIÓN</span><span>IMPORTE</span></div>
                 <div class="dashed-line"></div>
-
                 <div style="width:100%;">
                     ${venta.items.map(i => `
                         <div class="ticket-item-row">
@@ -471,40 +487,19 @@ export async function setupPOSLogic(router) {
                         </div>
                     `).join('')}
                 </div>
-
                 <div class="dashed-line"></div>
-                
                 <div class="ticket-totals">
-                    <div class="total-row big">
-                        <span>TOTAL</span>
-                        <span>$${venta.total.toFixed(2)}</span>
-                    </div>
-                    <div class="total-row">
-                        <span>Efectivo:</span>
-                        <span>$${venta.payment.received.toFixed(2)}</span>
-                    </div>
-                    <div class="total-row">
-                        <span>Cambio:</span>
-                        <span>$${venta.payment.change.toFixed(2)}</span>
-                    </div>
+                    <div class="total-row big"><span>TOTAL</span><span>$${venta.total.toFixed(2)}</span></div>
+                    <div class="total-row"><span>Efectivo:</span><span>$${venta.payment.received.toFixed(2)}</span></div>
+                    <div class="total-row"><span>Cambio:</span><span>$${venta.payment.change.toFixed(2)}</span></div>
                 </div>
-                
-                <div class="ticket-footer">
-                    <p>¡GRACIAS POR SU COMPRA!</p>
-                    <p>*** VUELVA PRONTO ***</p>
-                </div>
+                <div class="ticket-footer"><p>¡GRACIAS POR SU COMPRA!</p><p>*** VUELVA PRONTO ***</p></div>
             </div>
-
             <div class="no-print" style="margin-top:15px; display:flex; gap:10px; flex-direction:column;">
-                <button onclick="window.print()" class="pay-btn-large" style="padding:12px; font-size:1rem; background: var(--text-primary); color: var(--bg-card); box-shadow:none;">
-                    🖨️ Imprimir
-                </button>
-                <button id="close-ticket" style="padding:12px; border:1px solid var(--border-color); background:transparent; color:var(--text-secondary); border-radius:12px; cursor:pointer; font-weight:bold;">
-                    Cerrar
-                </button>
+                <button onclick="window.print()" class="pay-btn-large" style="padding:12px; font-size:1rem; background: var(--text-primary); color: var(--bg-card);">🖨️ Imprimir</button>
+                <button id="close-ticket" style="padding:12px; border:1px solid var(--border-color); background:transparent; color:var(--text-secondary); border-radius:12px; cursor:pointer; font-weight:bold;">Cerrar</button>
             </div>
         `;
-        
         const closeBtn = document.getElementById('close-ticket');
         if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; searchInput.focus(); });
     }

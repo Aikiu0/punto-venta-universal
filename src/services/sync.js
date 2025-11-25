@@ -1,16 +1,16 @@
-// src/services/sync.js - CORRECCIÓN DE NOMBRES DE COLUMNA
+// src/services/sync.js - VERSIÓN FINAL (Fix localStorage + payment_data)
 import { supabase } from '../data/supabase.js';
 import { db } from '../data/db-local.js';
 
 export const syncService = {
     listenConnection(callback) {
         window.addEventListener('online', () => {
-            console.log("📶 Conexión recuperada. Sincronizando...");
+            console.log("📶 Conexión recuperada. Iniciando Sincronización...");
             this.syncAll();
             callback(true);
         });
         window.addEventListener('offline', () => {
-            console.log("📡 Offline");
+            console.log("📡 Modo Offline activado");
             callback(false);
         });
         callback(navigator.onLine);
@@ -20,18 +20,18 @@ export const syncService = {
         if (!navigator.onLine) return;
 
         try {
-            // 1. PRIMERO SUBIMOS (Para que se reste el stock)
+            // 1. SUBIR VENTAS (Primero esto para restar stock)
             await this.uploadSales();
             
-            // 2. LUEGO BAJAMOS (Para ver el stock real actualizado)
+            // 2. BAJAR PRODUCTOS (Para ver el stock real actualizado)
             await this.downloadProducts();
             
-            // 3. Historial
+            // 3. BAJAR HISTORIAL
             await this.downloadSalesHistory();
             
-            console.log("✅ Sincronización Completada");
+            console.log("✅ Sincronización Completada Exitosamente");
         } catch (error) {
-            console.error("❌ Error Sync:", error);
+            console.error("❌ Error en el proceso de Sync:", error);
         }
     },
 
@@ -40,31 +40,34 @@ export const syncService = {
         if (pendingSales.length === 0) return;
 
         console.log(`☁️ Subiendo ${pendingSales.length} ventas...`);
-        const businessId = localStorage.getItem('archsell_business_id');
+        
+        // CORRECCIÓN MAYÚSCULA (localStorage)
+        const businessId = localStorage.getItem('archsell_business_id'); 
+        
+        if (!businessId) {
+            console.error("⚠️ No hay business_id, abortando sync.");
+            return;
+        }
 
         for (const sale of pendingSales) {
             try {
-                // --- CORRECCIÓN AQUÍ: LIMPIEZA Y MAPEO DE DATOS ---
-                // Quitamos lo que no va a la BD y renombramos 'payment' a 'payment_data'
+                // CORRECCIÓN DE DATOS (Evitar error 400)
                 const { id, sync_status, items_rpc, payment, ...restOfSale } = sale;
 
                 const saleToInsert = {
                     ...restOfSale,
-                    payment_data: payment, // <--- AQUÍ ESTABA EL ERROR 400
-                    items: sale.items,     // Items visuales
+                    payment_data: payment, // <--- Mapeo correcto para Supabase
+                    items: sale.items,
                     business_id: businessId,
                     created_at: new Date(sale.date).toISOString()
                 };
 
-                // B. Insertar en tabla 'sales'
+                // A. Insertar en tabla 'sales'
                 const { error: insertError } = await supabase.from('sales').insert(saleToInsert);
 
-                if (insertError) {
-                    console.error("Error insertando venta en Supabase:", insertError);
-                    throw insertError;
-                }
+                if (insertError) throw insertError;
 
-                // C. Ejecutar RPC para restar stock (Tolerante a qty/cantidad)
+                // B. Ejecutar RPC para restar stock
                 const itemsParaRPC = sale.items.map(item => ({
                     id: item.id,
                     qty: Number(item.cantidad || item.qty || 1)
@@ -77,11 +80,11 @@ export const syncService = {
 
                 if (rpcError) throw rpcError;
 
-                // D. Éxito: Actualizar Dexie
+                // C. Éxito: Actualizar Dexie
                 await db.sales.update(id, { sync_status: 'synced' });
 
             } catch (err) {
-                console.error("Error procesando venta ID:", sale.id, err);
+                console.error(`❌ Error procesando venta ID ${sale.id}:`, err);
             }
         }
     },
@@ -90,7 +93,6 @@ export const syncService = {
         const businessId = localStorage.getItem('archsell_business_id');
         if (!businessId) return;
 
-        // Descargamos productos del negocio
         const { data, error } = await supabase
             .from('products')
             .select('*')
@@ -98,7 +100,7 @@ export const syncService = {
 
         if (!error && data) {
             await db.products.bulkPut(data);
-            console.log("📦 Stock actualizado desde la nube");
+            console.log("📦 Productos actualizados desde la nube");
         }
     },
 
@@ -113,10 +115,9 @@ export const syncService = {
             .limit(50);
         
         if (data) {
-            // Mapear de vuelta payment_data -> payment para que el POS lo entienda
             const salesFormatted = data.map(s => ({
                 ...s,
-                payment: s.payment_data, // <--- Mapeo inverso para lectura
+                payment: s.payment_data, // Mapeo inverso para lectura local
                 date: new Date(s.created_at),
                 sync_status: 'synced'
             }));
