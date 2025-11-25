@@ -1,6 +1,8 @@
-// src/modules/admin/dashboard.js - CON CÁLCULO DE GANANCIAS
+// src/modules/admin/dashboard.js - OFFLINE FIRST + FIX NAN
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
+import { db } from '../../data/db-local.js'; // <--- IMPORTANTE
+import { syncService } from '../../services/sync.js'; // <--- IMPORTANTE
 
 let salesChartInstance = null;
 let topProductsChartInstance = null;
@@ -9,12 +11,16 @@ export function renderDashboard() {
     return `
         <div class="admin-container">
             <aside class="admin-sidebar">
-                <div class="sidebar-logo">🚀 Mi Negocio</div>
+                <div class="sidebar-logo" style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                    <img src="" class="app-logo-img" style="width:80px; height:auto; object-fit:contain; display:none;">
+                    <span class="app-name" style="font-size:1.2rem;">Cargando...</span>
+                </div>
                 <nav class="sidebar-menu">
                     <button class="menu-item active">📊 Dashboard</button>
                     <button class="menu-item" id="nav-orders">🔔 Pedidos Web</button>
                     <button class="menu-item" id="nav-inventory">📦 Inventario</button>
                     <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
+                    <button class="menu-item" id="nav-settings">⚙️ Configuración</button>
                     <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
                 </nav>
             </aside>
@@ -27,7 +33,7 @@ export function renderDashboard() {
                     </div>
                     
                     <div style="display:flex; gap:15px; align-items:center;">
-                         <button id="theme-toggle-dash" class="icon-btn" title="Cambiar Tema" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); width:40px; height:40px; border-radius:8px; cursor:pointer;">
+                        <button id="theme-toggle-dash" class="icon-btn" title="Cambiar Tema" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); width:40px; height:40px; border-radius:8px; cursor:pointer; display:flex; justify-content:center; align-items:center;">
                             🌗
                         </button>
                         
@@ -43,17 +49,14 @@ export function renderDashboard() {
                         <h3 style="color:var(--text-secondary); font-size:0.8rem; margin:0;">Ventas Hoy</h3>
                         <p id="kpi-today" style="font-size:1.8rem; font-weight:bold; color:var(--text-primary); margin:10px 0;">$0.00</p>
                     </div>
-                    
                     <div class="card-panel" style="border-left: 4px solid #10b981;">
                         <h3 style="color:var(--text-secondary); font-size:0.8rem; margin:0;">Ganancia Neta (Hoy)</h3>
                         <p id="kpi-profit" style="font-size:1.8rem; font-weight:bold; color:#10b981; margin:10px 0;">$0.00</p>
                     </div>
-
                     <div class="card-panel" style="border-left: 4px solid #f59e0b;">
                         <h3 style="color:var(--text-secondary); font-size:0.8rem; margin:0;">Pedidos Web</h3>
                         <p id="kpi-orders" style="font-size:1.8rem; font-weight:bold; color:var(--text-primary); margin:10px 0;">0</p>
                     </div>
-                    
                     <div class="card-panel" style="border-left: 4px solid #8b5cf6;">
                         <h3 style="color:var(--text-secondary); font-size:0.8rem; margin:0;">Ventas Mes</h3>
                         <p id="kpi-month" style="font-size:1.8rem; font-weight:bold; color:var(--text-primary); margin:10px 0;">$0</p>
@@ -89,54 +92,83 @@ export function renderDashboard() {
 
 export async function setupDashboardLogic(router) {
     const navTo = (path) => router.navigate(path);
+    
+    // Configuración Gráficas
+    Chart.defaults.color = '#94a3b8'; 
+    Chart.defaults.borderColor = '#334155'; 
+    Chart.defaults.font.family = "'Montserrat', sans-serif";
+
+    // Listeners
     document.getElementById('nav-inventory').addEventListener('click', () => navTo('/admin/inventory'));
     document.getElementById('nav-orders').addEventListener('click', () => navTo('/admin/orders'));
     document.getElementById('nav-pos').addEventListener('click', () => navTo('/pos'));
+    document.getElementById('nav-settings').addEventListener('click', () => navTo('/admin/settings'));
     document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
-    
     document.getElementById('theme-toggle-dash').addEventListener('click', () => ThemeService.toggle());
 
+    // --- LÓGICA HÍBRIDA (OFFLINE + ONLINE) ---
     async function loadMetrics() {
-        // Necesitamos ventas y productos (para saber el costo actual)
-        const { data: sales } = await supabase.from('sales').select('*');
-        const { data: products } = await supabase.from('products').select('id, name, stock, unit, cost_price'); 
-        const { count: ordersCount } = await supabase.from('web_orders').select('*', { count: 'exact', head: true }).eq('status', 'pendiente');
+        // 1. Cargar datos locales (Dexie) - INSTANTÁNEO
+        const localSales = await db.sales.toArray();
+        const localProducts = await db.products.toArray();
+        
+        // Renderizar con lo que hay
+        processAndRender(localSales, localProducts);
 
-        if(sales && products) {
-            calculateKPIs(sales, products, ordersCount || 0);
-            renderSalesChart(sales);
-            renderTopProducts(sales);
-            renderLowStock(products);
+        // 2. Si hay internet, actualizar en segundo plano
+        if (navigator.onLine) {
+            console.log("🔄 Sincronizando historial...");
+            await syncService.downloadSalesHistory(); // Descargar ventas nuevas
+            await syncService.downloadProducts(); // Descargar productos nuevos
+            
+            // Volver a leer y pintar
+            const updatedSales = await db.sales.toArray();
+            const updatedProducts = await db.products.toArray();
+            processAndRender(updatedSales, updatedProducts);
         }
+    }
+
+    async function processAndRender(sales, products) {
+        // Pedidos web pendientes (Requiere internet, si no hay, es 0)
+        let pendingOrders = 0;
+        if(navigator.onLine) {
+             const { count } = await supabase.from('web_orders').select('*', { count: 'exact', head: true }).eq('status', 'pendiente');
+             pendingOrders = count || 0;
+        }
+
+        calculateKPIs(sales, products, pendingOrders);
+        renderSalesChart(sales);
+        renderTopProducts(sales);
+        renderLowStock(products);
     }
 
     function calculateKPIs(sales, products, pendingOrders) {
         const today = new Date().toDateString();
         const currentMonth = new Date().getMonth();
-        let todaySales = 0, monthSales = 0;
-        let todayProfit = 0;
+        let todaySales = 0, monthSales = 0, todayProfit = 0;
         
-        // Mapa de costos para búsqueda rápida: { "Producto A": 50.00 }
+        // Mapa de costos { "Tornillo": 0.50 }
         const productCostMap = {};
-        products.forEach(p => { productCostMap[p.name] = p.cost_price || 0; });
+        products.forEach(p => { productCostMap[p.name] = Number(p.cost_price || 0); });
 
         sales.forEach(s => {
-            const d = new Date(s.created_at);
+            const d = new Date(s.date || s.created_at); // Compatible Dexie/Supabase
             const isToday = d.toDateString() === today;
-            const isThisMonth = d.getMonth() === currentMonth;
+            const totalVenta = Number(s.total || 0);
 
-            if (isToday) todaySales += s.total;
-            if (isThisMonth) monthSales += s.total;
+            if (isToday) todaySales += totalVenta;
+            if (d.getMonth() === currentMonth) monthSales += totalVenta;
 
-            // CALCULO DE GANANCIA (Solo Hoy para el KPI)
-            if (isToday && s.items) {
+            if (isToday && s.items && Array.isArray(s.items)) {
                 let saleCost = 0;
                 s.items.forEach(item => {
-                    // Intentamos obtener costo guardado en venta, si no existe, usamos costo actual del producto
-                    const unitCost = item.cost_price !== undefined ? item.cost_price : (productCostMap[item.name] || 0);
-                    saleCost += (unitCost * item.cantidad);
+                    if (item.type === 'meta') return;
+                    const qty = Number(item.cantidad || item.qty || 0);
+                    // Usar costo histórico de la venta O costo actual del producto
+                    let unitCost = (item.cost_price !== undefined) ? Number(item.cost_price) : (productCostMap[item.name] || 0);
+                    saleCost += (unitCost * qty);
                 });
-                todayProfit += (s.total - saleCost);
+                todayProfit += (totalVenta - saleCost);
             }
         });
 
@@ -154,8 +186,8 @@ export async function setupDashboardLogic(router) {
             last7Days[d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })] = 0;
         }
         sales.forEach(s => {
-            const k = new Date(s.created_at).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
-            if (last7Days[k] !== undefined) last7Days[k] += s.total;
+            const k = new Date(s.date || s.created_at).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
+            if (last7Days[k] !== undefined) last7Days[k] += Number(s.total || 0);
         });
 
         const ctx = document.getElementById('salesChart').getContext('2d');
@@ -168,17 +200,30 @@ export async function setupDashboardLogic(router) {
                     data: Object.values(last7Days),
                     borderColor: '#7A3F9D',
                     backgroundColor: 'rgba(122, 63, 157, 0.2)',
-                    tension: 0.3, fill: true
+                    tension: 0.3, fill: true,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#7A3F9D'
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: { 
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#94a3b8' } } },
+                scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } }
+            }
         });
     }
 
     function renderTopProducts(sales) {
         if (topProductsChartInstance) topProductsChartInstance.destroy();
         const counts = {};
-        sales.forEach(s => { if(s.items) s.items.forEach(i => { if(i.type!=='meta') counts[i.name]=(counts[i.name]||0)+i.cantidad; }); });
+        sales.forEach(s => { 
+            if(s.items) s.items.forEach(i => { 
+                if(i.type!=='meta') {
+                    const qty = Number(i.cantidad || i.qty || 0);
+                    counts[i.name] = (counts[i.name] || 0) + qty;
+                }
+            }); 
+        });
         const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
         
         const ctx = document.getElementById('topProductsChart').getContext('2d');
@@ -186,9 +231,16 @@ export async function setupDashboardLogic(router) {
             type: 'doughnut',
             data: {
                 labels: sorted.map(i=>i[0]),
-                datasets: [{ data: sorted.map(i=>i[1]), backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'], borderColor: 'transparent' }]
+                datasets: [{ 
+                    data: sorted.map(i=>i[1]), 
+                    backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'], 
+                    borderColor: 'var(--bg-card)', borderWidth: 2 
+                }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position:'right' } } }
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                plugins: { legend: { position:'right', labels: { color: '#94a3b8' } } } 
+            }
         });
     }
 

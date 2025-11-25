@@ -6,7 +6,10 @@ export function renderAdminOrders() {
     return `
         <div class="admin-container">
             <aside class="admin-sidebar">
-                <div class="sidebar-logo">🚀 Mi Negocio</div>
+                <div class="sidebar-logo" style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                    <img src="" class="app-logo-img" style="width:80px; height:auto; object-fit:contain; display:none;">
+                    <span class="app-name" style="font-size:1.2rem;">Cargando...</span>
+                </div>
                 <nav class="sidebar-menu">
                     <button class="menu-item" id="nav-dash">📊 Dashboard</button>
                     <button class="menu-item active">🔔 Pedidos Web</button>

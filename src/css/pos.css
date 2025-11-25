@@ -224,22 +224,121 @@
 /* --- TICKET IMPRESO (NO USAR VARIABLES AQUÍ) --- */
 /* Forzamos blanco y negro puro para asegurar impresión limpia */
 @media print {
-    body * { visibility: hidden; height: auto; overflow: visible; }
-    .modal-overlay, .modal-card, #printable-area, #printable-area * { visibility: visible; }
-    
-    .modal-overlay {
-        position: absolute; left: 0; top: 0; width: 100%; height: auto;
-        background: white !important; /* IMPORTANTE: Siempre blanco */
-        display: block !important; z-index: 9999;
+   @page {
+        size: 58mm auto;
+        margin: 0;
     }
-    .modal-card {
-        position: absolute; left: 0; top: 0; width: 100%; max-width: none;
-        box-shadow: none; padding: 0; margin: 0; border: none;
-        background: white !important;
-        color: black !important;
+
+    body {
+        width: 100%;
+        margin: 0;
+        background: white;
+        visibility: hidden;
     }
-    /* Asegurar textos negros en impresión */
-    .total-amount, .cart-title { color: black !important; }
+
+    .modal-overlay, .modal-card, #printable-area {
+        visibility: visible;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 0;
+        margin: 0;
+        background: white;
+        border: none;
+        box-shadow: none;
+    }
+
+    #printable-area {
+        width: 100%;
+        /* Margen interno de seguridad (Izquierda/Derecha 2mm) */
+        padding: 10px 2mm 40px 2mm; 
+        box-sizing: border-box;
+        /* Fuente monoespaciada: La clave para que todo alinee */
+        font-family: 'Courier New', Courier, monospace; 
+        font-size: 11px;
+        color: black;
+        line-height: 1.1; /* Texto compacto */
+        text-transform: uppercase; /* Todo mayúsculas se ve más ordenado */
+    }
+
+    /* --- ENCABEZADO (SIN LOGO) --- */
+    .ticket-header {
+        text-align: center;
+        margin-bottom: 10px;
+    }
     
+    .ticket-store-name {
+        font-size: 16px; /* Nombre grande */
+        font-weight: 900;
+        margin-bottom: 5px;
+        display: block;
+    }
+
+    .ticket-meta {
+        font-size: 10px;
+        margin-bottom: 2px;
+    }
+
+    /* --- SEPARADORES --- */
+    .dashed-line {
+        border-bottom: 1px dashed #000;
+        margin: 5px 0;
+        width: 100%;
+        height: 1px;
+    }
+
+    /* --- LISTA DE PRODUCTOS (GRILLA PERFECTA) --- */
+    .items-header {
+        display: flex;
+        justify-content: space-between;
+        font-weight: bold;
+        font-size: 10px;
+        margin-bottom: 5px;
+    }
+
+    .ticket-item-row {
+        display: grid;
+        /* Col 1: Cantidad (espacio fijo) | Col 2: Nombre (lo que sobre) | Col 3: Precio (ajustado) */
+        grid-template-columns: 25px 1fr auto; 
+        gap: 5px; /* Espacio entre columnas */
+        margin-bottom: 4px;
+        align-items: start;
+    }
+
+    .t-qty { font-weight: bold; text-align: center; }
+    .t-name { text-align: left; word-break: break-word; }
+    .t-price { text-align: right; font-weight: bold; white-space: nowrap; }
+
+    /* --- TOTALES (ALINEADOS A LA DERECHA) --- */
+    .ticket-totals {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end; /* Todo a la derecha */
+    }
+
+    .total-row {
+        display: flex;
+        justify-content: space-between;
+        width: 100%; /* Ocupar todo el ancho */
+        margin-bottom: 2px;
+    }
+
+    .total-row.big {
+        font-size: 16px;
+        font-weight: 900;
+        margin-top: 5px;
+        padding-top: 5px;
+        border-top: 1px dashed #000;
+    }
+
+    /* --- PIE --- */
+    .ticket-footer {
+        text-align: center;
+        margin-top: 15px;
+        font-size: 10px;
+    }
+
     .no-print { display: none !important; }
 }

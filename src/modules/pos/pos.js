@@ -1,9 +1,9 @@
-// src/modules/pos/pos.js - MODO OSCURO READY
-import { db, isDbEmpty, seedDummyData } from '../../data/db-local.js';
+// src/modules/pos/pos.js - VERSIÓN FINAL COMPLETA
+import { db } from '../../data/db-local.js';
 import { supabase } from '../../data/supabase.js';
 import { syncService } from '../../services/sync.js';
-import { ThemeService } from '../../services/theme.js'; // Importamos servicio de tema
-
+import { ThemeService } from '../../services/theme.js';
+import { SettingsService } from '../../services/settings.js';
 let carrito = [];
 let productosGlobal = [];
 let totalVenta = 0;
@@ -15,7 +15,7 @@ export function renderPOS() {
         <div class="pos-layout">
             <div class="catalog-panel">
                 <div class="catalog-header">
-                    <div class="search-wrapper"><span class="search-icon">🔍</span><input type="text" id="search" class="search-input" placeholder="Buscar..." autocomplete="off"></div>
+                    <div class="search-wrapper"><span class="search-icon">🔍</span><input type="text" id="search" class="search-input" placeholder="Buscar producto..." autocomplete="off"></div>
                     <button id="btn-view-list" class="view-btn active">☰</button>
                     <button id="btn-view-grid" class="view-btn">田</button>
                 </div>
@@ -26,10 +26,11 @@ export function renderPOS() {
                 <div class="cart-header">
                     <div class="cart-title">Ticket</div>
                     <div class="header-actions">
+
                         <button id="pos-theme-toggle" class="icon-btn" title="Cambiar Tema">🌗</button>
 
                         <div style="position:relative;">
-                            <button id="btn-web-orders" title="Pedidos Web" style="border:none; background:var(--admin-bg); color:var(--admin-text); border-radius:8px; width:42px; height:38px; cursor:pointer; font-size:1.3rem; display:flex; align-items:center; justify-content:center;">🔔</button>
+                            <button id="btn-web-orders" title="Pedidos Web" style="border:none; background:var(--bg-input); color:var(--text-secondary); border-radius:8px; width:42px; height:38px; cursor:pointer; font-size:1.3rem; display:flex; align-items:center; justify-content:center;">🔔</button>
                             <div id="orders-badge" style="position:absolute; top:-5px; right:-5px; background:#ef4444; color:white; border-radius:50%; width:20px; height:20px; font-size:0.75rem; font-weight:bold; display:none; justify-content:center; align-items:center; box-shadow:0 2px 5px rgba(0,0,0,0.2); z-index:10;">0</div>
                         </div>
 
@@ -37,7 +38,6 @@ export function renderPOS() {
                             <span>...</span>
                         </div>
                         <button id="btn-sync" class="icon-btn" title="Sync">🔄</button>
-                        <button id="btn-back-admin" class="icon-btn admin-btn" style="display:none;">🛠️</button>
                         <button id="logout-btn" class="icon-btn" style="color:var(--danger-color);">⏻</button>
                     </div>
                 </div>
@@ -74,10 +74,53 @@ export async function setupPOSLogic(router) {
     const btnOrders = document.getElementById('btn-web-orders');
     const badgeOrders = document.getElementById('orders-badge');
 
-    // 0. TEMA
-    document.getElementById('pos-theme-toggle').addEventListener('click', () => ThemeService.toggle());
+    // --- 0. CARGA AUTOMÁTICA DE PRODUCTOS (FIX) ---
+    async function loadInitialData() {
+        try {
+            // 1. Cargar desde Dexie (rápido)
+            productosGlobal = await db.products.toArray();
+            
+            // 2. Si hay datos, mostrar inmediatamente
+            if (productosGlobal.length > 0) {
+                renderGrid(productosGlobal);
+            } else {
+                // 3. Si está vacío y hay red, descargar
+                if (navigator.onLine) {
+                    await syncService.downloadProducts();
+                    productosGlobal = await db.products.toArray();
+                    renderGrid(productosGlobal);
+                }
+            }
+        } catch (error) {
+            console.error("Error cargando productos iniciales:", error);
+        }
+    }
+    // Ejecutar inmediatamente
+    loadInitialData();
 
-    // 1. AUDIO
+
+    // --- 1. SEGURIDAD: VERIFICAR ROL ---
+    checkUserRole();
+    async function checkUserRole() {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+                if (profile && profile.role === 'admin') {
+                    const btnAdmin = document.getElementById('btn-back-admin');
+                    if(btnAdmin) {
+                        btnAdmin.style.display = 'flex';
+                        btnAdmin.onclick = () => router.navigate('/admin');
+                    }
+                }
+            }
+        } catch (error) { console.error(error); }
+    }
+
+    // --- ACCIONES GENERALES ---
+    document.getElementById('pos-theme-toggle').addEventListener('click', () => ThemeService.toggle());
+    
+    // 2. AUDIO
     function initAudio() {
         if (audioContext) return;
         try {
@@ -102,14 +145,13 @@ export async function setupPOSLogic(router) {
         } catch(e) {}
     }
 
-    // 2. PEDIDOS
+    // 3. PEDIDOS WEB
     async function checkPendingOrders() {
         const { count, error } = await supabase.from('web_orders').select('*', { count: 'exact', head: true }).eq('status', 'pendiente');
         if (!error) {
             const current = parseInt(badgeOrders.textContent) || 0;
             if (count > 0) {
                 badgeOrders.style.display = "flex"; badgeOrders.textContent = count; 
-                // Color de fondo badge
                 btnOrders.style.background = "var(--admin-bg)"; 
                 btnOrders.style.color = "var(--admin-text)";
                 if (count > current) { showToast("Nuevo Pedido Web"); }
@@ -142,7 +184,7 @@ export async function setupPOSLogic(router) {
     ordersCheckInterval = setInterval(checkPendingOrders, 10000);
     checkPendingOrders();
 
-    // 3. MODAL PEDIDOS (CORREGIDO CON VARIABLES)
+    // 4. MODAL PEDIDOS
     btnOrders.addEventListener('click', openWebOrdersModal);
     
     async function openWebOrdersModal() {
@@ -189,7 +231,6 @@ export async function setupPOSLogic(router) {
         let method = "EFECTIVO";
         const meta = order.items.find(i => i.type === 'meta');
         if (meta && meta.payment_method) method = meta.payment_method.toUpperCase();
-
         if (method.includes("EFECTIVO")) { abrirModalCobroWeb(order); } 
         else { await saveWebSale(order, order.total, 0); }
     }
@@ -199,35 +240,18 @@ export async function setupPOSLogic(router) {
         modalContent.innerHTML = `
             <h2 style="color:var(--text-secondary);margin:0">Cobro Pedido Web</h2>
             <div style="font-size:2.5rem;font-weight:800;color:var(--text-primary);margin-bottom:20px">$${order.total.toFixed(2)}</div>
-            <input type="number" id="web-input-received" class="pay-input-giant" placeholder="Recibido" autofocus style="color:var(--text-primary); border-bottom:2px solid var(--border-color);">
-            <div style="background:var(--bg-input);padding:15px;border-radius:12px;margin-bottom:20px">
-                <span style="color:var(--text-secondary)">Cambio:</span><strong id="web-change-label" style="font-size:1.5rem;display:block;color:var(--text-primary);">$0.00</strong>
-            </div>
-            <div style="display:flex;gap:10px">
-                <button id="btn-cancel-web" style="flex:1;padding:15px;border:none;background:var(--bg-input);color:var(--text-primary);border-radius:12px;cursor:pointer">Cancelar</button>
-                <button id="btn-confirm-web" style="flex:2;padding:15px;border:none;background:var(--success-bg);color:white;font-weight:bold;border-radius:12px;cursor:pointer;opacity:0.5" disabled>FINALIZAR</button>
-            </div>
+            <input type="number" id="web-input-received" class="pay-input-giant" placeholder="Recibido" autofocus style="background:transparent; color:var(--text-primary); border-bottom:2px solid var(--border-color);">
+            <div style="background:var(--bg-input);padding:15px;border-radius:12px;margin-bottom:20px"><span style="color:var(--text-secondary)">Cambio:</span><strong id="web-change-label" style="font-size:1.5rem;display:block;color:var(--text-primary);">$0.00</strong></div>
+            <div style="display:flex;gap:10px"><button id="btn-cancel-web" style="flex:1;padding:15px;border:none;background:var(--bg-input);color:var(--text-primary);border-radius:12px;cursor:pointer">Cancelar</button><button id="btn-confirm-web" style="flex:2;padding:15px;border:none;background:var(--success-bg);color:white;font-weight:bold;border-radius:12px;cursor:pointer;opacity:0.5" disabled>FINALIZAR</button></div>
         `;
-        
-        const input = document.getElementById('web-input-received');
-        const changeLabel = document.getElementById('web-change-label');
-        const btnConfirm = document.getElementById('btn-confirm-web');
-        
+        const input = document.getElementById('web-input-received'), change = document.getElementById('web-change-label'), btn = document.getElementById('btn-confirm-web');
         input.focus();
         input.addEventListener('input', e => {
-            const val = parseFloat(e.target.value) || 0;
-            const diff = val - order.total;
-            changeLabel.textContent = `$${diff.toFixed(2)}`;
-            if(diff >= 0) { changeLabel.style.color = 'var(--success-bg)'; btnConfirm.disabled = false; btnConfirm.style.opacity = "1"; } 
-            else { changeLabel.style.color = 'var(--danger-color)'; btnConfirm.disabled = true; btnConfirm.style.opacity = "0.5"; }
+            const val = parseFloat(e.target.value) || 0; const diff = val - order.total;
+            change.textContent = `$${diff.toFixed(2)}`;
+            if(diff >= 0) { change.style.color = 'var(--success-bg)'; btn.disabled = false; btn.style.opacity = "1"; } else { change.style.color = 'var(--danger-color)'; btn.disabled = true; btn.style.opacity = "0.5"; }
         });
-
-        btnConfirm.addEventListener('click', () => {
-            const received = parseFloat(input.value);
-            const change = received - order.total;
-            saveWebSale(order, received, change);
-        });
-
+        btn.addEventListener('click', () => saveWebSale(order, parseFloat(input.value), parseFloat(input.value) - order.total));
         document.getElementById('btn-cancel-web').addEventListener('click', () => openWebOrdersModal());
     }
 
@@ -235,43 +259,19 @@ export async function setupPOSLogic(router) {
         try {
             const { data: authData } = await supabase.auth.getUser();
             if (!authData || !authData.user) { alert("Sesión expirada"); return; }
-
-            const itemsNormalizados = order.items
-                .filter(i => i.type !== 'meta')
-                .map(i => ({ ...i, cantidad: Number(i.qty || i.cantidad || 1), unit: i.unit || 'pz' }));
-
+            const itemsNormalizados = order.items.filter(i => i.type !== 'meta').map(i => ({ ...i, cantidad: Number(i.qty || i.cantidad || 1), unit: i.unit || 'pz' }));
             let method = "Web/Pickup";
             const meta = order.items.find(i => i.type === 'meta');
             if (meta && meta.payment_method) method = meta.payment_method.toUpperCase();
 
-            const venta = {
-                date: new Date(), total: order.total, items: itemsNormalizados,
-                payment: { method: method, received: received, change: change }
-            };
-
-            await supabase.from('sales').insert({
-                created_at: new Date(), total: order.total, items: itemsNormalizados,
-                payment_data: { method: method, customer: order.customer_name, received: received, change: change },
-                user_id: authData.user.id, local_id: null
-            });
-
+            const venta = { date: new Date(), total: order.total, items: itemsNormalizados, payment: { method: method, received: received, change: change } };
+            await supabase.from('sales').insert({ created_at: new Date(), total: order.total, items: itemsNormalizados, payment_data: { method: method, customer: order.customer_name, received: received, change: change }, user_id: authData.user.id, local_id: null });
             await supabase.from('web_orders').update({ status: 'entregado' }).eq('id', order.id);
-            checkPendingOrders();
-            mostrarTicket(venta);
-
+            checkPendingOrders(); mostrarTicket(venta);
         } catch (error) { console.error(error); alert("Error: " + error.message); }
     }
 
-    // 4. GENERAL
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-        if (profile && profile.role === 'admin') {
-            document.getElementById('btn-back-admin').style.display = 'flex';
-            document.getElementById('btn-back-admin').addEventListener('click', () => router.navigate('/admin'));
-        }
-    }
-    
+    // 5. SINCRONIZACIÓN Y EVENTOS UI
     syncService.listenConnection(async (isOnline) => {
         if(isOnline) {
             statusBadge.innerHTML = `📶 Conectado`; statusBadge.style.backgroundColor = "#dcfce7"; statusBadge.style.color = "#166534";
@@ -290,8 +290,7 @@ export async function setupPOSLogic(router) {
 
     document.getElementById('logout-btn').addEventListener('click', async () => { 
         if(ordersCheckInterval) clearInterval(ordersCheckInterval);
-        supabase.removeAllChannels();
-        await supabase.auth.signOut(); router.navigate('/'); 
+        supabase.removeAllChannels(); await supabase.auth.signOut(); router.navigate('/'); 
     });
 
     searchInput.focus();
@@ -321,7 +320,6 @@ export async function setupPOSLogic(router) {
             let color = p.stock <= 10 ? 'var(--danger-color)' : 'var(--success-bg)'; 
             let bg = p.stock <= 10 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)'; 
             if(p.stock===0){color='var(--text-secondary)';bg='var(--bg-input)';}
-            
             card.innerHTML = `<div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-sku">${p.sku||'--'}</div><div class="stock-badge" style="background:${bg};color:${color}">${p.stock} ${p.unit||'pz'}</div></div><div class="prod-price">$${p.price}</div>`;
             card.addEventListener('click', () => { if(p.stock>0) addToCart(p); else alert("Agotado"); });
             container.appendChild(card);
@@ -343,16 +341,11 @@ export async function setupPOSLogic(router) {
     }
 
     function updateCartItemQty(index, newQty) {
-        if(newQty <= 0) {
-            if(confirm("¿Quitar del carrito?")) carrito.splice(index, 1);
-        } else {
+        if(newQty <= 0) { if(confirm("¿Quitar del carrito?")) carrito.splice(index, 1); } 
+        else {
             const item = carrito[index];
-            if(newQty > item.stock) {
-                alert(`Stock insuficiente. Máximo: ${item.stock}`);
-                carrito[index].cantidad = item.stock;
-            } else {
-                carrito[index].cantidad = newQty;
-            }
+            if(newQty > item.stock) { alert(`Stock insuficiente. Máximo: ${item.stock}`); carrito[index].cantidad = item.stock; } 
+            else { carrito[index].cantidad = newQty; }
         }
         renderCart();
     }
@@ -362,42 +355,16 @@ export async function setupPOSLogic(router) {
     function renderCart() {
         cartItemsContainer.innerHTML = ''; totalVenta = 0;
         if(carrito.length===0) { cartItemsContainer.innerHTML = `<div style="text-align:center;color:var(--text-secondary);margin-top:50px"><div style="font-size:3rem">🛒</div><p>Vacío</p></div>`; cartTotalLabel.textContent='$0.00'; return; }
-        
         carrito.forEach((item, idx) => {
             totalVenta += item.price * item.cantidad;
             const unit = item.unit || 'pz';
-            
-            const qtyInput = `
-                <input type="number" class="qty-input-pos" data-idx="${idx}" value="${item.cantidad}" 
-                style="width:50px; padding:5px; text-align:center; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:4px; font-weight:bold;">
-            `;
-
+            const qtyInput = `<input type="number" class="qty-input-pos" data-idx="${idx}" value="${item.cantidad}" style="width:50px; padding:5px; text-align:center; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:4px; font-weight:bold;">`;
             const div = document.createElement('div'); div.className = 'cart-item';
-            div.innerHTML = `
-                <div>
-                    <div style="font-weight:bold;color:var(--text-primary)">${item.name}</div>
-                    <div style="color:var(--text-secondary); display:flex; align-items:center; gap:5px; margin-top:5px;">
-                        ${qtyInput} <span style="font-size:0.9rem;">${unit} x $${item.price}</span>
-                    </div>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px">
-                    <div style="font-weight:bold;color:var(--brand-color)">$${(item.price*item.cantidad).toFixed(2)}</div>
-                    <button class="rm-btn" data-i="${idx}" style="color:var(--danger-color);border:none;background:none;cursor:pointer">×</button>
-                </div>`;
+            div.innerHTML = `<div><div style="font-weight:bold;color:var(--text-primary)">${item.name}</div><div style="color:var(--text-secondary); display:flex; align-items:center; gap:5px; margin-top:5px;">${qtyInput} <span style="font-size:0.9rem;">${unit} x $${item.price}</span></div></div><div style="display:flex;align-items:center;gap:10px"><div style="font-weight:bold;color:var(--brand-color)">$${(item.price*item.cantidad).toFixed(2)}</div><button class="rm-btn" data-i="${idx}" style="color:var(--danger-color);border:none;background:none;cursor:pointer">×</button></div>`;
             cartItemsContainer.appendChild(div);
         });
-        
         cartTotalLabel.textContent = `$${totalVenta.toFixed(2)}`;
-        
-        document.querySelectorAll('.qty-input-pos').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const idx = parseInt(e.target.dataset.idx);
-                const val = parseFloat(e.target.value);
-                updateCartItemQty(idx, val);
-            });
-            input.addEventListener('focus', (e) => e.target.select());
-        });
-
+        document.querySelectorAll('.qty-input-pos').forEach(input => { input.addEventListener('change', (e) => updateCartItemQty(parseInt(e.target.dataset.idx), parseFloat(e.target.value))); input.addEventListener('focus', (e) => e.target.select()); });
         document.querySelectorAll('.rm-btn').forEach(b => b.addEventListener('click', e => removeFromCart(e.target.dataset.i)));
     }
 
@@ -405,19 +372,10 @@ export async function setupPOSLogic(router) {
 
     function abrirModalCobro() {
         modal.style.display = 'flex';
-        modalContent.innerHTML = `<h2 style="color:var(--text-secondary);margin:0">Total</h2>
-        <div style="font-size:2.5rem;font-weight:800;color:var(--text-primary);margin-bottom:20px">$${totalVenta.toFixed(2)}</div>
-        <input type="number" id="input-received" class="pay-input-giant" placeholder="Recibido" autofocus style="background:transparent; color:var(--text-primary); border-bottom:2px solid var(--border-color);">
-        <div style="background:var(--bg-input);padding:15px;border-radius:12px;margin-bottom:20px"><span style="color:var(--text-secondary)">Cambio:</span><strong id="change-label" style="font-size:1.5rem;display:block;color:var(--text-primary)">$0.00</strong></div>
-        <div style="display:flex;gap:10px"><button id="btn-cancel-modal" style="flex:1;padding:15px;border:none;background:var(--bg-input);color:var(--text-primary);border-radius:12px;cursor:pointer">Cancelar</button><button id="btn-confirm-pay" style="flex:2;padding:15px;border:none;background:var(--success-bg);color:white;font-weight:bold;border-radius:12px;cursor:pointer;opacity:0.5" disabled>CONFIRMAR</button></div>`;
+        modalContent.innerHTML = `<h2 style="color:var(--text-secondary);margin:0">Total</h2><div style="font-size:2.5rem;font-weight:800;color:var(--text-primary);margin-bottom:20px">$${totalVenta.toFixed(2)}</div><input type="number" id="input-received" class="pay-input-giant" placeholder="Recibido" autofocus style="background:transparent; color:var(--text-primary); border-bottom:2px solid var(--border-color);"><div style="background:var(--bg-input);padding:15px;border-radius:12px;margin-bottom:20px"><span style="color:var(--text-secondary)">Cambio:</span><strong id="change-label" style="font-size:1.5rem;display:block;color:var(--text-primary)">$0.00</strong></div><div style="display:flex;gap:10px"><button id="btn-cancel-modal" style="flex:1;padding:15px;border:none;background:var(--bg-input);color:var(--text-primary);border-radius:12px;cursor:pointer">Cancelar</button><button id="btn-confirm-pay" style="flex:2;padding:15px;border:none;background:var(--success-bg);color:white;font-weight:bold;border-radius:12px;cursor:pointer;opacity:0.5" disabled>CONFIRMAR</button></div>`;
         const input = document.getElementById('input-received'), change = document.getElementById('change-label'), btn = document.getElementById('btn-confirm-pay');
         input.focus();
-        input.addEventListener('input', e => {
-            const val = parseFloat(e.target.value) || 0; const c = val - totalVenta;
-            change.textContent = `$${c.toFixed(2)}`;
-            if(c>=0) { change.style.color='var(--success-bg)'; btn.disabled=false; btn.style.opacity="1"; }
-            else { change.style.color='var(--danger-color)'; btn.disabled=true; btn.style.opacity="0.5"; }
-        });
+        input.addEventListener('input', e => { const val = parseFloat(e.target.value) || 0; const c = val - totalVenta; change.textContent = `$${c.toFixed(2)}`; if(c>=0) { change.style.color='var(--success-bg)'; btn.disabled=false; btn.style.opacity="1"; } else { change.style.color='var(--danger-color)'; btn.disabled=true; btn.style.opacity="0.5"; } });
         btn.addEventListener('click', () => procesarVenta(parseFloat(input.value)));
         document.getElementById('btn-cancel-modal').addEventListener('click', () => { modal.style.display = 'none'; searchInput.focus(); });
     }
@@ -432,38 +390,74 @@ export async function setupPOSLogic(router) {
     }
 
     function mostrarTicket(venta) {
-        // En el ticket NO usamos variables para asegurar impresión blanca limpia
+        const s = SettingsService.get(); 
+
         modalContent.innerHTML = `
-        <div id="printable-area" style="text-align:center;font-family:'Courier New', monospace; padding:20px; background:white; color:black; max-width:350px; margin:0 auto; border-radius: 4px;">
-            <div style="font-size:1.2rem;font-weight:bold;margin-bottom:10px">FERRETERÍA</div>
-            <div style="margin-bottom:10px">${new Date(venta.date).toLocaleString()}</div>
-            <div style="border-bottom:1px dashed #000;margin-bottom:10px"></div>
-            
-            <div style="text-align:left;">
-                ${venta.items.map(i=>`<div style="display:flex;justify-content:space-between; margin-bottom:4px;"><span>${i.cantidad} ${i.name.substring(0,20)}</span><span>$${(i.price*i.cantidad).toFixed(2)}</span></div>`).join('')}
+            <div id="printable-area">
+                
+                <div class="ticket-header">
+                    <div class="ticket-store-name">${s.store_name}</div>
+                    ${s.address ? `<div class="ticket-meta">${s.address}</div>` : ''}
+                    ${s.phone ? `<div class="ticket-meta">Tel: ${s.phone}</div>` : ''}
+                    <div class="ticket-meta" style="margin-top:5px;">
+                        ${new Date(venta.date).toLocaleString()}
+                    </div>
+                </div>
+
+                <div class="dashed-line"></div>
+                
+                <div class="items-header">
+                    <span>CANT</span>
+                    <span>DESCRIPCIÓN</span>
+                    <span>IMPORTE</span>
+                </div>
+
+                <div class="dashed-line"></div>
+
+                <div style="width:100%;">
+                    ${venta.items.map(i => `
+                        <div class="ticket-item-row">
+                            <div class="t-qty">${i.cantidad}</div>
+                            <div class="t-name">${i.name}</div>
+                            <div class="t-price">$${(i.price * i.cantidad).toFixed(2)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="dashed-line"></div>
+                
+                <div class="ticket-totals">
+                    <div class="total-row big">
+                        <span>TOTAL</span>
+                        <span>$${venta.total.toFixed(2)}</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Efectivo:</span>
+                        <span>$${venta.payment.received.toFixed(2)}</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Cambio:</span>
+                        <span>$${venta.payment.change.toFixed(2)}</span>
+                    </div>
+                </div>
+                
+                <div class="ticket-footer">
+                    <p>¡GRACIAS POR SU COMPRA!</p>
+                    <p>*** VUELVA PRONTO ***</p>
+                </div>
             </div>
 
-            <div style="border-bottom:1px dashed #000;margin:10px 0;"></div>
-            
-            <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:1.2rem;"><span>TOTAL</span><span>$${venta.total.toFixed(2)}</span></div>
-            <div style="display:flex;justify-content:space-between; margin-top:5px;"><span>Efectivo:</span><span>$${venta.payment.received.toFixed(2)}</span></div>
-            <div style="display:flex;justify-content:space-between;"><span>Cambio:</span><span>$${venta.payment.change.toFixed(2)}</span></div>
-            
-            <div style="margin-top:20px;font-size:0.9rem">¡Gracias por su compra!</div>
-        </div>
-
-        <div class="no-print" style="margin-top:20px; display:flex; gap:10px; flex-direction:column;">
-            <button onclick="window.print()" class="pay-btn-large" style="padding:12px; font-size:1rem; background: var(--text-primary); color: var(--bg-card); box-shadow:none;">
-                🖨️ Imprimir Ticket
-            </button>
-            <button id="close-ticket" style="padding:12px; border:1px solid var(--border-color); background:transparent; color:var(--text-secondary); border-radius:12px; cursor:pointer; font-weight:bold;">
-                Cerrar Ventana
-            </button>
-        </div>
-    `;
-    
-    // Re-bind del evento cerrar
-    const closeBtn = document.getElementById('close-ticket');
-    if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; searchInput.focus(); });
+            <div class="no-print" style="margin-top:15px; display:flex; gap:10px; flex-direction:column;">
+                <button onclick="window.print()" class="pay-btn-large" style="padding:12px; font-size:1rem; background: var(--text-primary); color: var(--bg-card); box-shadow:none;">
+                    🖨️ Imprimir
+                </button>
+                <button id="close-ticket" style="padding:12px; border:1px solid var(--border-color); background:transparent; color:var(--text-secondary); border-radius:12px; cursor:pointer; font-weight:bold;">
+                    Cerrar
+                </button>
+            </div>
+        `;
+        
+        const closeBtn = document.getElementById('close-ticket');
+        if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; searchInput.focus(); });
     }
 }

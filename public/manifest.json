@@ -1,0 +1,20 @@
+{
+  "name": "Punto de Venta",
+  "short_name": "Mi Pos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#7A3F9D",
+  "icons": [
+    {
+      "src": "pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
