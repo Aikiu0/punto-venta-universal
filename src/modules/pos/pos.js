@@ -381,12 +381,60 @@ export async function setupPOSLogic(router) {
     }
 
     async function procesarVenta(recibido) {
-        const venta = { date: new Date(), total: totalVenta, items: [...carrito], payment: { method: 'cash', received: recibido, change: recibido - totalVenta }, sync_status: 'pending' };
+        const businessId = localStorage.getItem('archsell_business_id');
+        const userRole = localStorage.getItem('archsell_role'); // Opcional, por si lo necesitas
+
+        // 2. Preparar los items para el RPC (Solo ID y Cantidad)
+        // Esto es lo que Supabase usará para restar el stock
+        const itemsForRpc = carrito.map(item => ({
+            id: item.id,
+            qty: item.cantidad
+        }));
+
+        // 3. Crear objeto venta
+        const venta = { 
+            date: new Date(), 
+            total: totalVenta, 
+            
+            // Guardamos items completos para el historial visual (nombres, precios en ese momento)
+            items: [...carrito], 
+            
+            // Guardamos la versión "minificada" para el proceso de sync
+            items_rpc: itemsForRpc,
+
+            payment: { 
+                method: 'cash', 
+                received: recibido, 
+                change: recibido - totalVenta 
+            }, 
+            sync_status: 'pending',
+            business_id: businessId // <--- CRUCIAL: Sin esto, no es multi-tenant
+        };
+
+        // 4. Guardar en Dexie (Local)
         await db.sales.add(venta);
-        for(const i of carrito) { const p = await db.products.get(i.id); if(p){ p.stock-=i.cantidad; await db.products.put(p); } }
-        productosGlobal = await db.products.toArray(); renderGrid(productosGlobal);
+
+        // 5. Restar Stock Visualmente en Dexie (Feedback inmediato al cajero)
+        for(const i of carrito) { 
+            const p = await db.products.get(i.id); 
+            if(p){ 
+                p.stock -= i.cantidad; 
+                await db.products.put(p); 
+            } 
+        }
+
+        // 6. Actualizar UI
+        productosGlobal = await db.products.toArray(); 
+        renderGrid(productosGlobal);
+
+        // 7. Intentar Sincronizar (Si hay internet)
+        // syncService.uploadSales() se encargará de mandar el business_id y ejecutar el RPC
         if(navigator.onLine) await syncService.uploadSales();
-        mostrarTicket(venta); carrito=[]; renderCart();
+
+        // 8. Mostrar Ticket y Limpiar
+        mostrarTicket(venta); 
+        carrito = []; 
+        renderCart();
     }
 
     function mostrarTicket(venta) {
