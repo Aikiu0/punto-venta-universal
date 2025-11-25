@@ -1,8 +1,8 @@
-// src/modules/admin/dashboard.js - OFFLINE FIRST + FIX NAN
+// src/modules/admin/dashboard.js - OFFLINE FIRST + SALES VS COSTS CHART
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
-import { db } from '../../data/db-local.js'; // <--- IMPORTANTE
-import { syncService } from '../../services/sync.js'; // <--- IMPORTANTE
+import { db } from '../../data/db-local.js';
+import { syncService } from '../../services/sync.js';
 
 let salesChartInstance = null;
 let topProductsChartInstance = null;
@@ -92,20 +92,23 @@ export function renderDashboard() {
 }
 
 export async function setupDashboardLogic(router) {
-    const navTo = (path) => router.navigate(path);
-    
     // Configuración Gráficas
     Chart.defaults.color = '#94a3b8'; 
     Chart.defaults.borderColor = '#334155'; 
     Chart.defaults.font.family = "'Montserrat', sans-serif";
 
-    // Listeners
-    document.getElementById('nav-inventory').addEventListener('click', () => navTo('/admin/inventory'));
-    document.getElementById('nav-orders').addEventListener('click', () => navTo('/admin/orders'));
-    document.getElementById('nav-pos').addEventListener('click', () => navTo('/pos'));
-    document.getElementById('nav-settings').addEventListener('click', () => navTo('/admin/settings'));
-    document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
-    document.getElementById('nav-history').addEventListener('click', () => navTo('/admin/history'));
+    // --- CORRECCIÓN DE NAVEGACIÓN (Usar router.navigate directo) ---
+    document.getElementById('nav-inventory').addEventListener('click', () => router.navigate('/admin/inventory'));
+    document.getElementById('nav-orders').addEventListener('click', () => router.navigate('/admin/orders'));
+    document.getElementById('nav-pos').addEventListener('click', () => router.navigate('/pos'));
+    document.getElementById('nav-settings').addEventListener('click', () => router.navigate('/admin/settings'));
+    document.getElementById('nav-history').addEventListener('click', () => router.navigate('/admin/history'));
+    
+    document.getElementById('nav-logout').addEventListener('click', async () => { 
+        await supabase.auth.signOut(); 
+        router.navigate('/'); 
+    });
+    
     document.getElementById('theme-toggle-dash').addEventListener('click', () => ThemeService.toggle());
 
     // --- LÓGICA HÍBRIDA (OFFLINE + ONLINE) ---
@@ -131,7 +134,7 @@ export async function setupDashboardLogic(router) {
     }
 
     async function processAndRender(sales, products) {
-        // Pedidos web pendientes (Requiere internet, si no hay, es 0)
+        // Pedidos web pendientes
         let pendingOrders = 0;
         if(navigator.onLine) {
              const { count } = await supabase.from('web_orders').select('*', { count: 'exact', head: true }).eq('status', 'pendiente');
@@ -139,7 +142,7 @@ export async function setupDashboardLogic(router) {
         }
 
         calculateKPIs(sales, products, pendingOrders);
-        renderSalesChart(sales);
+        renderSalesChart(sales, products); // Le pasamos productos para saber los costos
         renderTopProducts(sales);
         renderLowStock(products);
     }
@@ -149,12 +152,12 @@ export async function setupDashboardLogic(router) {
         const currentMonth = new Date().getMonth();
         let todaySales = 0, monthSales = 0, todayProfit = 0;
         
-        // Mapa de costos { "Tornillo": 0.50 }
+        // Mapa de costos { "Tornillo": 0.50 } para búsqueda rápida
         const productCostMap = {};
         products.forEach(p => { productCostMap[p.name] = Number(p.cost_price || 0); });
 
         sales.forEach(s => {
-            const d = new Date(s.date || s.created_at); // Compatible Dexie/Supabase
+            const d = new Date(s.date || s.created_at);
             const isToday = d.toDateString() === today;
             const totalVenta = Number(s.total || 0);
 
@@ -166,7 +169,7 @@ export async function setupDashboardLogic(router) {
                 s.items.forEach(item => {
                     if (item.type === 'meta') return;
                     const qty = Number(item.cantidad || item.qty || 0);
-                    // Usar costo histórico de la venta O costo actual del producto
+                    // Usar costo guardado en el item o buscar en el mapa actual
                     let unitCost = (item.cost_price !== undefined) ? Number(item.cost_price) : (productCostMap[item.name] || 0);
                     saleCost += (unitCost * qty);
                 });
@@ -180,37 +183,84 @@ export async function setupDashboardLogic(router) {
         document.getElementById('kpi-orders').textContent = pendingOrders;
     }
 
-    function renderSalesChart(sales) {
+    // --- GRÁFICA CORREGIDA: VENTAS VS COSTOS ---
+    function renderSalesChart(sales, products) {
         if (salesChartInstance) salesChartInstance.destroy();
-        const last7Days = {};
+
+        // 1. Crear Mapa de Costos (Por si la venta no guardó el costo histórico)
+        const productCostMap = {};
+        products.forEach(p => { productCostMap[p.name] = Number(p.cost_price || 0); });
+
+        // 2. Inicializar acumuladores de los últimos 7 días
+        const last7DaysSales = {};
+        const last7DaysCosts = {};
+
         for(let i=6; i>=0; i--) {
             const d = new Date(); d.setDate(d.getDate() - i);
-            last7Days[d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })] = 0;
+            const key = d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
+            last7DaysSales[key] = 0;
+            last7DaysCosts[key] = 0;
         }
+
+        // 3. Llenar datos
         sales.forEach(s => {
-            const k = new Date(s.date || s.created_at).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
-            if (last7Days[k] !== undefined) last7Days[k] += Number(s.total || 0);
+            const dateKey = new Date(s.date || s.created_at).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
+            
+            // Si la fecha está dentro del rango de la gráfica
+            if (last7DaysSales[dateKey] !== undefined) {
+                const totalVenta = Number(s.total || 0);
+                let totalCosto = 0;
+
+                // Calcular costo de esta venta
+                if(s.items && Array.isArray(s.items)) {
+                    s.items.forEach(item => {
+                        if(item.type === 'meta') return;
+                        const qty = Number(item.cantidad || item.qty || 0);
+                        // Preferir costo histórico, sino costo actual
+                        const unitCost = (item.cost_price !== undefined) ? Number(item.cost_price) : (productCostMap[item.name] || 0);
+                        totalCosto += (qty * unitCost);
+                    });
+                }
+
+                last7DaysSales[dateKey] += totalVenta;
+                last7DaysCosts[dateKey] += totalCosto;
+            }
         });
 
+        // 4. Renderizar Chart.js con DOS datasets
         const ctx = document.getElementById('salesChart').getContext('2d');
         salesChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: Object.keys(last7Days),
-                datasets: [{
-                    label: 'Ventas ($)',
-                    data: Object.values(last7Days),
-                    borderColor: '#7A3F9D',
-                    backgroundColor: 'rgba(122, 63, 157, 0.2)',
-                    tension: 0.3, fill: true,
-                    pointBackgroundColor: '#fff',
-                    pointBorderColor: '#7A3F9D'
-                }]
+                labels: Object.keys(last7DaysSales),
+                datasets: [
+                    {
+                        label: 'Ventas ($)',
+                        data: Object.values(last7DaysSales),
+                        borderColor: '#7A3F9D',
+                        backgroundColor: 'rgba(122, 63, 157, 0.2)',
+                        tension: 0.3, fill: true,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#7A3F9D'
+                    },
+                    {
+                        label: 'Costos ($)', // <--- NUEVA LÍNEA
+                        data: Object.values(last7DaysCosts),
+                        borderColor: '#ef4444', // Rojo
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.3, fill: true,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#ef4444'
+                    }
+                ]
             },
             options: { 
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { labels: { color: '#94a3b8' } } },
-                scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }, x: { ticks: { color: '#94a3b8' }, grid: { display: false } } }
+                scales: { 
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, beginAtZero: true }, 
+                    x: { ticks: { color: '#94a3b8' }, grid: { display: false } } 
+                }
             }
         });
     }

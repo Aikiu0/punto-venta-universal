@@ -129,7 +129,7 @@ export async function setupInventoryLogic(router) {
     document.getElementById('nav-orders').addEventListener('click', () => router.navigate('/admin/orders'));
     document.getElementById('nav-pos').addEventListener('click', () => router.navigate('/pos'));
     document.getElementById('nav-settings').addEventListener('click', () => router.navigate('/admin/settings'));
-    document.getElementById('nav-history').addEventListener('click', () => navTo('/admin/history'));
+    document.getElementById('nav-history').addEventListener('click', () => router.navigate('/admin/history'));
     document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
     document.getElementById('theme-toggle-inv').addEventListener('click', () => ThemeService.toggle());
     

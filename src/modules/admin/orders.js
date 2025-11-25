@@ -49,8 +49,8 @@ export async function setupOrdersLogic(router) {
     document.getElementById('nav-dash').addEventListener('click', () => router.navigate('/admin'));
     document.getElementById('nav-inventory').addEventListener('click', () => router.navigate('/admin/inventory'));
     document.getElementById('nav-pos').addEventListener('click', () => router.navigate('/pos'));
-    document.getElementById('nav-settings').addEventListener('click', () => navTo('/admin/settings'))
-    document.getElementById('nav-history').addEventListener('click', () => navTo('/admin/history'));
+    document.getElementById('nav-settings').addEventListener('click', () => router.navigate('/admin/settings'))
+    document.getElementById('nav-history').addEventListener('click', () => router.navigate('/admin/history'));
     document.getElementById('nav-logout').addEventListener('click', async () => { 
         supabase.removeAllChannels();
         await supabase.auth.signOut(); 
