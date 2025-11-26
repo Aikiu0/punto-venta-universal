@@ -342,3 +342,77 @@
 
     .no-print { display: none !important; }
 }
+
+/* --- AGREGAR AL FINAL DE src/css/pos.css --- */
+
+/* Botón flotante del carrito (Oculto en PC) */
+.fab-cart { display: none; }
+
+@media (max-width: 768px) {
+    /* Layout Vertical */
+    .pos-layout {
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* Catálogo ocupa toda la pantalla */
+    .catalog-panel {
+        width: 100%;
+        height: 100%;
+        padding: 10px;
+        overflow-y: auto;
+        padding-bottom: 80px; /* Espacio para el botón flotante */
+    }
+
+    /* Panel del Carrito (Oculto a la derecha) */
+    .cart-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2000;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        background: var(--bg-card);
+    }
+
+    .cart-panel.active {
+        transform: translateX(0); /* Mostrar */
+    }
+
+    /* Botón Flotante para abrir carrito */
+    .fab-cart {
+        display: flex;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        background: var(--brand-color);
+        color: white;
+        border-radius: 50%;
+        justify-content: center;
+        align-items: center;
+        font-size: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        z-index: 1500;
+        border: none;
+        cursor: pointer;
+    }
+
+    /* Ajustes de la barra de búsqueda */
+    .search-wrapper {
+        max-width: 140px;
+    }
+    
+    .header-actions {
+        gap: 5px;
+    }
+    
+    /* Ocultar botón "Ir a Caja" en el menú lateral si estorba */
+    .admin-sidebar .menu-item {
+        padding: 12px 15px;
+    }
+}
