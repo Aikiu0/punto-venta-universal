@@ -43,29 +43,46 @@ export function setupLoginLogic(router) {
         const password = document.getElementById('password').value;
 
         try {
-            // 2. Autenticación Auth
+            // --- PASO 1: AUTENTICACIÓN ---
             const { data, error } = await supabase.auth.signInWithPassword({
                 email: email,
                 password: password,
             });
 
             if (error) throw error;
-
-            // 3. Obtener ROL y BUSINESS_ID (CRÍTICO PARA SAAS)
             const user = data.user;
+
+            // --- PASO 2: OBTENER PERFIL (ROL Y ID NEGOCIO) ---
             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
-                .select('role, business_id') // <--- AQUÍ PEDIMOS EL ID DEL NEGOCIO
+                .select('role, business_id') 
                 .eq('id', user.id)
                 .single();
 
             if (profileError) throw profileError;
 
+            // --- PASO 3: OBTENER PLAN DEL NEGOCIO (CONSULTA DIRECTA) ---
+            // Esto es más seguro que el join automático
+            let planNegocio = 'esencial'; // Valor por defecto
+
+            if (profile.business_id) {
+                const { data: businessData, error: businessError } = await supabase
+                    .from('businesses')
+                    .select('plan')
+                    .eq('id', profile.business_id)
+                    .single();
+                
+                if (!businessError && businessData) {
+                    planNegocio = businessData.plan;
+                }
+            }
+
             // 4. Guardar credenciales en el navegador
             localStorage.setItem('archsell_business_id', profile.business_id);
             localStorage.setItem('archsell_role', profile.role);
+            localStorage.setItem('archsell_plan', planNegocio); // <--- AQUÍ GUARDAMOS EL PLAN REAL
 
-            console.log("Login exitoso. Negocio ID:", profile.business_id);
+            console.log("Login exitoso. Rol:", profile.role, "Plan:", planNegocio);
             
             // 5. Redirigir
             if (profile.role === 'admin') {
@@ -79,7 +96,7 @@ export function setupLoginLogic(router) {
             btnSubmit.disabled = false;
             
             let mensaje = "Error: Usuario o contraseña incorrectos.";
-            if (error.message.includes("profile")) mensaje = "Error crítico: Usuario sin perfil de negocio asignado.";
+            if (error.message && error.message.includes("profile")) mensaje = "Error crítico: Usuario sin perfil de negocio asignado.";
             
             errorMsg.textContent = mensaje;
             errorMsg.style.display = 'block';

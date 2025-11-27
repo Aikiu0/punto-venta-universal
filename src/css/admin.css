@@ -140,35 +140,41 @@
 
 /* --- AGREGAR AL FINAL DE src/css/admin.css --- */
 
-/* Botón Hamburguesa (Oculto en PC) */
+/* Por defecto (PC) el botón de menú está oculto */
 #mobile-menu-btn { display: none; }
+.sidebar-overlay { display: none; }
 
+/* --- ESTILOS MÓVILES (Celular) --- */
 @media (max-width: 768px) {
-    /* Reorganizar el contenedor principal */
+    
+    /* 1. Contenedor Principal */
     .admin-container {
         flex-direction: column;
-        height: auto;
+        display: block; /* Importante para que no se rompa el flujo */
+        position: relative;
         overflow-x: hidden;
     }
 
-    /* Sidebar Móvil (Oculto por defecto) */
+    /* 2. Menú Lateral (Oculto por defecto) */
     .admin-sidebar {
         position: fixed;
         top: 0;
         left: 0;
         height: 100vh;
-        width: 250px;
-        z-index: 1000;
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
-        box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+        width: 260px;
+        background: var(--bg-card);
+        z-index: 2000; /* Muy arriba */
+        transform: translateX(-100%); /* Escondido a la izquierda */
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 4px 0 15px rgba(0,0,0,0.5);
     }
 
+    /* Clase para mostrar el menú */
     .admin-sidebar.active {
-        transform: translateX(0); /* Mostrar al activar */
+        transform: translateX(0);
     }
 
-    /* Overlay oscuro */
+    /* Fondo oscuro al abrir menú */
     .sidebar-overlay {
         display: none;
         position: fixed;
@@ -176,31 +182,54 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0,0,0,0.5);
-        z-index: 999;
+        background: rgba(0,0,0,0.6);
+        z-index: 1999;
+        backdrop-filter: blur(2px);
     }
     .sidebar-overlay.active { display: block; }
 
-    /* Botón de menú visible en móvil */
+    /* 3. Botón Hamburguesa (Visible solo en móvil) */
     #mobile-menu-btn {
-        display: block !important;
-        background: none;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
         border: none;
-        font-size: 1.8rem;
+        font-size: 2rem; /* Grande */
         color: var(--text-primary);
         cursor: pointer;
+        padding: 5px 10px;
         margin-right: 10px;
     }
 
-    /* Ajustes de contenido */
+    /* 4. Contenido Central (Centrado) */
     .admin-content {
+        margin-left: 0 !important; /* Quitar margen de PC */
         width: 100%;
-        padding: 10px;
-        margin-left: 0;
+        padding: 15px;
+        box-sizing: border-box;
     }
 
-    /* Ajustar gráficas al ancho del celular */
+    /* Encabezado más compacto */
+    .content-header {
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .page-title h1 {
+        font-size: 1.4rem;
+        margin: 0;
+    }
+
+    /* Tarjetas centradas y bonitas */
+    .card-panel {
+        margin-bottom: 15px;
+        border-radius: 12px;
+    }
+
+    /* Gráficas ajustadas */
     .card-panel canvas {
-        max-height: 250px !important;
+        max-height: 220px !important;
     }
 }

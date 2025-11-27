@@ -1,252 +1,310 @@
-// src/modules/shop/shop.js - TIENDA DINÁMICA MULTI-TENANT (FIXED)
+// src/modules/shop/shop.js - VERSIÓN DEBUG
 import { supabase } from '../../data/supabase.js';
-import { SettingsService } from '../../services/settings.js';
 
-// ID DEL NEGOCIO DEMO (Para que la tienda sepa a quién comprarle)
-const DEMO_BUSINESS_ID = '00000000-0000-0000-0000-000000000001';
-
-// Estado del Carrito y Productos
 let shopCart = [];
 let shopProducts = [];
+let currentBusiness = null; 
 
 export function renderShop() {
-    const s = SettingsService.get();
-
     return `
-        <div class="shop-layout">
-            <header class="shop-header" style="display: flex; align-items: center; gap: 15px;">
-                <div style="display: flex; align-items: center; gap: 10px; flex-grow: 1;">
-                    <img src="${s.logo_url}" class="app-logo-img" style="height: 40px; width: auto; display: ${s.logo_url ? 'block' : 'none'}; border-radius: 5px;">
-                    <a href="#/shop" class="brand-logo app-name" style="text-decoration: none; color: inherit; font-weight: bold; font-size: 1.2rem;">
-                        ${s.store_name || 'Mi Tienda'}
-                    </a>
+        <div id="shop-root" class="shop-layout" style="min-height:100vh; background:var(--bg-body); font-family:'Montserrat', sans-serif;">
+            <div class="loading-screen" style="padding:100px; text-align:center; color:var(--text-secondary);">
+                <h2>Cargando...</h2>
+            </div>
+        </div>
+    `;
+}
+
+// --- VISTA 1: MARKETPLACE ---
+function renderMarketplace() {
+    return `
+        <div class="marketplace-wrapper" style="min-height:100vh; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding-bottom:50px;">
+            <div style="text-align:center; padding:60px 20px; color:white;">
+                <h1 style="font-size:3rem; margin-bottom:10px;">Bienvenido a ArchSell</h1>
+                <p style="font-size:1.2rem; opacity:0.9; max-width:600px; margin:0 auto;">La red de ferreterías más confiable.</p>
+                <div style="position:relative; max-width:600px; margin:40px auto 0;">
+                    <input type="text" id="store-finder" placeholder="Buscar ferretería..." 
+                        style="width:100%; padding:18px 20px; border-radius:50px; border:none; font-size:1.1rem; box-shadow:0 10px 30px rgba(0,0,0,0.2); outline:none; color:#333;">
                 </div>
-
-                <nav class="shop-nav">
-                    <button id="btn-open-cart" class="btn-cart-float" style="border:none; cursor:pointer;">
-                        🛒 <span id="cart-count">0</span>
-                    </button>
-                </nav>
-            </header>
-
-            <div class="shop-hero">
-                <h1>Todo para tu proyecto</h1>
-                <p>Haz tu pedido en línea y pasa a recoger.</p>
             </div>
-
-            <div class="shop-container">
-                <aside class="shop-filters">
-                    <span class="filter-title">Categorías</span>
-                    <ul class="category-list" id="shop-categories">
-                        <li class="category-item active" data-cat="all">Todas</li>
-                        <li style="color:#ccc; font-size:0.8rem;">Cargando...</li>
-                    </ul>
-                </aside>
-
-                <main>
-                    <div id="shop-grid" class="shop-grid">
-                        <p style="grid-column: 1/-1; text-align: center; padding: 50px;">Cargando productos...</p>
-                    </div>
-                </main>
-            </div>
-
-            <div class="shop-modal-overlay" id="cart-overlay">
-                <div class="shop-drawer">
-                    <div class="drawer-header">
-                        <div class="drawer-title">Tu Pedido</div>
-                        <button id="btn-close-cart" class="btn-close-drawer">×</button>
-                    </div>
-                    
-                    <div class="drawer-body" id="cart-body">
-                    </div>
+            <div class="marketplace-container" style="max-width:1000px; margin:0 auto; padding:20px;">
+                <h3 style="color:white; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;">Tiendas Disponibles</h3>
+                <div id="stores-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:25px;">
+                    <p style="color:white;">Cargando tiendas...</p>
                 </div>
             </div>
         </div>
     `;
 }
 
-export async function setupShopLogic(router) {
-    const s = SettingsService.get();
-    const logoEl = document.querySelector('.shop-header .app-logo-img');
-    const nameEl = document.querySelector('.shop-header .app-name');
+// --- VISTA 2: TIENDA ---
+function renderStoreUI(business) {
+    const logo = business.logo_url || '';
+    const name = business.name || 'Tienda';
+    const color = business.primary_color || '#7A3F9D'; 
     
-    if (s.logo_url && logoEl) {
-        logoEl.src = s.logo_url;
-        logoEl.style.display = 'block';
-    }
-    if (s.store_name && nameEl) {
-        nameEl.textContent = s.store_name;
-    }
-    const grid = document.getElementById('shop-grid');
-    const catList = document.getElementById('shop-categories');
-    const cartCount = document.getElementById('cart-count');
-    const cartOverlay = document.getElementById('cart-overlay');
-    const cartBody = document.getElementById('cart-body');
+    return `
+        <div class="shop-layout">
+            <header class="shop-header" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; background:white; padding:15px 20px; box-shadow:0 2px 10px rgba(0,0,0,0.05); position:sticky; top:0; z-index:100;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    ${logo ? `<img src="${logo}" style="height: 45px; width:auto; border-radius: 5px;">` : ''}
+                    <div>
+                        <a href="#/shop?s=${business.slug}" style="text-decoration: none; color: #1f2937; font-weight: 800; font-size: 1.2rem; line-height:1.2; display:block;">${name}</a>
+                        <a href="#/shop" style="font-size:0.85rem; color:#6b7280; text-decoration:none;">← Directorio</a>
+                    </div>
+                </div>
+                <nav class="shop-nav" style="display:flex; align-items:center;">
+                    <button id="btn-open-cart" class="btn-cart-float" style="
+    border:none;
+    cursor:pointer;
+    background:${color};
+    color:white;
+    width:56px;
+    height:56px;
+    border-radius:50%;
+    font-size:1.4rem;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    box-shadow:0 6px 18px rgba(0,0,0,0.25);
+    transition:transform 0.2s;
+">
+    🛒
+    <span id="cart-count" style="
+        position:absolute;
+        top:-6px;
+        right:-6px;
+        min-width:20px;
+        height:20px;
+        background:#ef4444;
+        color:white;
+        border-radius:50%;
+        font-size:0.7rem;
+        font-weight:800;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:2px;
+        box-shadow:0 2px 6px rgba(0,0,0,0.3);
+    ">0</span>
+</button>
+                </nav>
+            </header>
 
-    // --- 1. CARGAR DATOS ---
-    async function loadData() {
-        // Categorías (Filtradas por negocio)
-        const { data: cats } = await supabase
-            .from('categories')
-            .select('*')
-            .eq('business_id', DEMO_BUSINESS_ID); // <--- FIX
+            <div class="shop-hero" style="background: linear-gradient(135deg, ${color} 0%, #1e293b 100%); padding:60px 20px; text-align:center; color:white;">
+                <h1 style="margin:0; font-size:2.5rem; text-shadow:0 2px 5px rgba(0,0,0,0.2);">Catálogo en Línea</h1>
+                <p style="opacity:0.95; font-size:1.1rem; margin-top:10px;">Haz tu pedido y pasa a recoger.</p>
+            </div>
 
+            <div class="shop-container" style="padding:40px 20px; max-width:1200px; margin:0 auto; display:grid; grid-template-columns: 220px 1fr; gap:40px;">
+                <aside class="shop-filters" style="display:block;">
+                    <div style="background:white; padding:20px; border-radius:12px; box-shadow:0 2px 15px rgba(0,0,0,0.03);">
+                        <span style="font-weight:bold; display:block; margin-bottom:15px; font-size:1.1rem; color:#333;">Categorías</span>
+                        <ul id="shop-categories" style="list-style:none; padding:0; margin:0;">
+                            <li class="category-item active" data-cat="all" style="padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; background:#f3f4f6; color:#333; font-weight:bold;">Todas</li>
+                        </ul>
+                    </div>
+                </aside>
+                <main>
+                    <div id="shop-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:25px;">
+                        <p style="grid-column: 1/-1; text-align: center; padding: 50px; color:#666;">Cargando productos...</p>
+                    </div>
+                </main>
+            </div>
+
+            <div class="shop-modal-overlay" id="cart-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:flex-end; backdrop-filter:blur(2px);">
+                <div class="shop-drawer" style="background:white; width:100%; max-width:450px; height:100%; display:flex; flex-direction:column; box-shadow:-5px 0 30px rgba(0,0,0,0.2); color:#333;">
+                    
+                    <div class="drawer-header" style="padding:20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; flex-shrink:0;">
+                        <div class="drawer-title" style="font-weight:bold; font-size:1.2rem; color:#111;">Tu Pedido</div>
+                        <button id="btn-close-cart" style="background:none; border:none; font-size:2rem; cursor:pointer; color:#666; line-height:1;">&times;</button>
+                    </div>
+                    
+                    <div class="drawer-body" id="cart-body" style="flex:1; overflow-y:auto; padding:20px;"></div>
+                </div>
+            </div>
+            <style>
+                @media(max-width:768px) { .shop-container { grid-template-columns: 1fr; } .shop-filters { display:none !important; } }
+            </style>
+        </div>
+    `;
+}
+
+export async function setupShopLogic(router) {
+    const root = document.getElementById('shop-root');
+    const params = new URLSearchParams(window.location.hash.split('?')[1]);
+    const storeSlug = params.get('s');
+
+    if (!storeSlug) {
+        root.innerHTML = renderMarketplace();
+        setupMarketplaceLogic();
+    } else {
+        await loadStore(storeSlug);
+    }
+
+    async function setupMarketplaceLogic() {
+        const grid = document.getElementById('stores-grid');
+        const search = document.getElementById('store-finder');
+        const { data: stores } = await supabase.from('businesses').select('id, name, slug, logo_url, primary_color').limit(50);
+        
+        function renderStoreCards(list) {
+            if(!list || list.length === 0) return grid.innerHTML = '<p style="color:white;">No se encontraron tiendas.</p>';
+            grid.innerHTML = list.map(s => `
+                <div onclick="window.location.hash='#/shop?s=${s.slug}'; location.reload();" 
+                     style="background:white; border-radius:16px; padding:25px; text-align:center; cursor:pointer; transition:transform 0.2s; box-shadow:0 4px 15px rgba(0,0,0,0.1); position:relative; overflow:hidden;">
+                    <div style="position:absolute; top:0; left:0; width:100%; height:6px; background:${s.primary_color || '#7A3F9D'};"></div>
+                    <div style="height:80px; display:flex; align-items:center; justify-content:center; margin-bottom:15px;">
+                        ${s.logo_url ? `<img src="${s.logo_url}" style="max-height:70px; max-width:100%; object-fit:contain;">` : '<span style="font-size:3.5rem;">🏪</span>'}
+                    </div>
+                    <h3 style="margin:0 0 5px 0; font-size:1.2rem; color:#1f2937; font-weight:bold;">${s.name}</h3>
+                    <p style="margin:0; color:#6b7280; font-size:0.9rem;">Ver catálogo &rarr;</p>
+                </div>
+            `).join('');
+        }
+        renderStoreCards(stores || []);
+        search.addEventListener('input', (e) => renderStoreCards(stores.filter(s => s.name.toLowerCase().includes(e.target.value.toLowerCase()))));
+    }
+
+    async function loadStore(slug) {
+        try {
+            const { data: business, error } = await supabase.from('businesses').select('*').eq('slug', slug).single();
+            if (error || !business) {
+                root.innerHTML = `<div style="text-align:center; padding:100px; color:#fff;"><h2>🚫 Tienda no encontrada</h2><a href="#/shop" style="color:#4ade80;">Volver al directorio</a></div>`;
+                return;
+            }
+            currentBusiness = business;
+            root.innerHTML = renderStoreUI(business);
+            setupStoreInteractions();
+            loadCatalog(business.id);
+        } catch (err) { console.error(err); }
+    }
+
+    async function loadCatalog(businessId) {
+        const { data: cats } = await supabase.from('categories').select('*').eq('business_id', businessId);
+        const { data: prods } = await supabase.from('products').select('*').eq('business_id', businessId).gt('stock', 0);
+        shopProducts = prods || [];
+        renderProducts(shopProducts);
+        
         if (cats) {
-            catList.innerHTML = `<li class="category-item active" data-cat="all">Todas</li>`;
+            const catList = document.getElementById('shop-categories');
+            catList.innerHTML = `<li class="category-item active" data-cat="all" style="padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; background:#e5e7eb; color:#333; font-weight:bold;">Todas</li>`;
             cats.forEach(c => {
                 const li = document.createElement('li');
-                li.className = 'category-item';
-                li.textContent = c.name;
-                li.addEventListener('click', () => filterProducts(c.name, li));
+                li.className = 'category-item'; li.textContent = c.name;
+                li.style.cssText = "padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; color:#666; transition:0.2s;";
+                li.addEventListener('click', () => {
+                    document.querySelectorAll('.category-item').forEach(i => {i.style.background='transparent'; i.style.fontWeight='normal'; i.style.color='#666';});
+                    li.style.background = '#e5e7eb'; li.style.fontWeight='bold'; li.style.color='#333';
+                    renderProducts(shopProducts.filter(p => p.category === c.name));
+                });
                 catList.appendChild(li);
             });
-            catList.querySelector('[data-cat="all"]').addEventListener('click', (e) => filterProducts('all', e.target));
-        }
-
-        // Productos (Solo con stock positivo y del negocio correcto)
-        const { data: prods } = await supabase
-            .from('products')
-            .select('*')
-            .eq('business_id', DEMO_BUSINESS_ID) // <--- FIX
-            .gt('stock', 0);
-            
-        if (prods) {
-            shopProducts = prods;
-            renderProducts(shopProducts);
+            catList.querySelector('[data-cat="all"]').addEventListener('click', (e) => {
+                document.querySelectorAll('.category-item').forEach(i => {i.style.background='transparent'; i.style.fontWeight='normal'; i.style.color='#666';});
+                e.target.style.background = '#e5e7eb'; e.target.style.fontWeight='bold'; e.target.style.color='#333';
+                renderProducts(shopProducts);
+            });
         }
     }
 
     function renderProducts(products) {
+        const grid = document.getElementById('shop-grid');
         grid.innerHTML = '';
-        if (products.length === 0) return grid.innerHTML = `<p style="text-align:center; width:100%;">No hay productos disponibles.</p>`;
+        if (products.length === 0) return grid.innerHTML = `<p style="text-align:center; width:100%; color:#666;">No hay productos disponibles.</p>`;
 
         products.forEach(p => {
             const card = document.createElement('div');
             card.className = 'shop-card';
-            
+            card.style.cssText = "background:white; border:1px solid #eee; border-radius:12px; overflow:hidden; transition:transform 0.2s; display:flex; flex-direction:column; box-shadow:0 2px 8px rgba(0,0,0,0.05);";
             const unit = p.unit || 'pz';
-            const bulkBadge = p.is_bulk ? `<span style="font-size:0.7rem; background:#e0f2fe; color:#0284c7; padding:2px 6px; border-radius:4px;">Granel</span>` : '';
+            const bulkBadge = p.is_bulk ? `<span style="font-size:0.7rem; background:#e0f2fe; color:#0284c7; padding:2px 6px; border-radius:4px; font-weight:bold;">GRANEL</span>` : '';
 
             card.innerHTML = `
-                <div class="card-img-placeholder">📦</div>
-                <div class="card-body">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span class="card-cat">${p.category}</span>
-                        ${bulkBadge}
+                <div style="height:160px; background:#f8fafc; display:flex; align-items:center; justify-content:center; font-size:3.5rem;">📦</div>
+                <div style="padding:15px; flex:1; display:flex; flex-direction:column;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span style="font-size:0.75rem; color:#9ca3af; text-transform:uppercase; font-weight:bold; letter-spacing:0.5px;">${p.category || 'General'}</span>${bulkBadge}
                     </div>
-                    <div class="card-title">${p.name}</div>
-                    <div class="card-price">$${p.price.toFixed(2)} <span style="font-size:0.8rem; color:#999; font-weight:normal;">/${unit}</span></div>
-                    <div style="font-size:0.8rem; color:#64748b; margin-bottom:10px;">
-                        Disponible: ${p.stock} ${unit}
+                    <h3 style="margin:0 0 5px 0; font-size:1.1rem; color:#1f2937; font-weight:700; line-height:1.3;">${p.name}</h3>
+                    <div style="margin-top:auto;">
+                        <div style="font-size:1.4rem; font-weight:800; color:#10b981; margin:5px 0;">$${p.price.toFixed(2)} <span style="font-size:0.8rem; color:#9ca3af; font-weight:normal;">/${unit}</span></div>
+                        <small style="color:#6b7280; display:block; margin-bottom:10px;">Disponible: <b>${p.stock}</b></small>
+                        <button class="btn-add" style="width:100%; padding:12px; background:${currentBusiness.primary_color || '#7A3F9D'}; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; transition:0.2s;">Agregar al Carrito</button>
                     </div>
-                    <button class="btn-add-cart">Agregar</button>
                 </div>
             `;
-            card.querySelector('button').addEventListener('click', () => addToCart(p));
+            card.querySelector('.btn-add').addEventListener('click', () => addToCart(p));
             grid.appendChild(card);
         });
     }
 
-    function filterProducts(cat, el) {
-        document.querySelectorAll('.category-item').forEach(i => i.classList.remove('active'));
-        el.classList.add('active');
-        if (cat === 'all') renderProducts(shopProducts);
-        else renderProducts(shopProducts.filter(p => p.category === cat));
+    function setupStoreInteractions() {
+        const overlay = document.getElementById('cart-overlay');
+        document.getElementById('btn-open-cart').addEventListener('click', () => {
+            if(shopCart.length === 0) return alert("Tu carrito está vacío");
+            overlay.style.display = 'flex';
+            renderCartDrawer();
+        });
+        document.getElementById('btn-close-cart').addEventListener('click', () => overlay.style.display = 'none');
+        overlay.addEventListener('click', (e) => { if(e.target===overlay) overlay.style.display='none'; });
     }
 
-    // --- 2. LÓGICA CARRITO ---
-    
     function addToCart(p) {
-        let cantidad = 1;
-        const unit = p.unit || 'pz';
-
-        // Si es a granel, preguntar cantidad inicial
-        if (p.is_bulk) {
-            let input = prompt(`📏 Producto a Granel: ${p.name}\nPrecio: $${p.price}/${unit}\nDisponible: ${p.stock}\n\n¿Cuántos ${unit} necesitas?`, "1");
-            if (input === null) return; 
-            
-            input = input.replace(',', '.'); 
-            cantidad = parseFloat(input);
-
-            if (isNaN(cantidad) || cantidad <= 0) return alert("Cantidad inválida");
-        }
-
-        // Validar Stock
-        const existing = shopCart.find(i => i.id === p.id);
-        const currentQty = existing ? existing.qty : 0;
-
-        if (currentQty + cantidad > p.stock) {
-            return alert(`⚠️ Solo hay ${p.stock} ${unit} disponibles.`);
-        }
-
-        if (existing) {
-            existing.qty += cantidad;
-            existing.qty = Math.round(existing.qty * 1000) / 1000;
-        } else {
-            shopCart.push({ ...p, qty: cantidad });
-        }
-        
+        const ex = shopCart.find(i=>i.id===p.id);
+        if((ex?ex.qty:0)+1 > p.stock) return alert("Sin stock suficiente");
+        if(ex) ex.qty += 1; else shopCart.push({...p, qty: 1});
         updateCartUI();
         renderCartDrawer();
-        
-        // Animación
         const btn = document.getElementById('btn-open-cart');
-        btn.style.transform = "scale(1.2)";
-        setTimeout(() => btn.style.transform = "scale(1)", 200);
+        if (btn) {
+        btn.style.transform = 'scale(1.15)';
+        setTimeout(() => btn.style.transform = 'scale(1)', 150);}
     }
 
     function updateCartUI() {
-        const count = shopCart.length; 
-        document.getElementById('cart-count').textContent = count;
+        const count = shopCart.reduce((a,b) => a + b.qty, 0); 
+        const el = document.getElementById('cart-count');
+        if(el) el.textContent = Math.floor(count);
     }
 
     function updateItemQty(index, newQty) {
-        if (newQty <= 0) {
-            if(confirm("¿Quitar producto del carrito?")) shopCart.splice(index, 1);
+        const item = shopCart[index];
+        if(newQty <= 0) {
+            if(confirm("¿Quitar producto?")) shopCart.splice(index, 1);
+        } else if (newQty > item.stock) {
+            alert(`Stock insuficiente. Máximo: ${item.stock}`);
+            shopCart[index].qty = item.stock;
         } else {
-            const item = shopCart[index];
-            if (newQty > item.stock) {
-                alert(`⚠️ Stock insuficiente. Máximo: ${item.stock}`);
-                shopCart[index].qty = item.stock;
-            } else {
-                shopCart[index].qty = parseFloat(newQty.toFixed(3));
-            }
+            shopCart[index].qty = parseFloat(newQty.toFixed(3));
         }
         updateCartUI();
         renderCartDrawer();
     }
 
     function renderCartDrawer() {
-        if (shopCart.length === 0) {
-            cartBody.innerHTML = `<div style="text-align:center; margin-top:50px; color:#999;">
-                <p>Tu carrito está vacío 😢</p>
-                <button id="btn-start-shopping" style="margin-top:10px; padding:10px; border:1px solid #ccc; background:white; border-radius:5px; cursor:pointer;">Seguir comprando</button>
-            </div>`;
-            document.getElementById('btn-start-shopping')?.addEventListener('click', () => cartOverlay.style.display = 'none');
-            return;
-        }
-
+        const body = document.getElementById('cart-body');
+        if(!body) return;
         let total = 0;
         const itemsHtml = shopCart.map((item, idx) => {
             const subtotal = item.price * item.qty;
             total += subtotal;
-            const unit = item.unit || 'pz';
-            const isBulk = item.is_bulk;
-
+            
             let qtyControl = '';
-            if (isBulk) {
+            if (item.is_bulk) {
                 qtyControl = `
                     <div style="display:flex; align-items:center; gap:5px;">
                         <input type="number" class="qty-input-bulk" data-idx="${idx}" value="${item.qty}" step="0.1" min="0.1" style="width:60px; padding:5px; text-align:center; border:1px solid #ddd; border-radius:4px;">
-                        <span style="font-size:0.8rem; color:#666;">${unit}</span>
+                        <span style="font-size:0.8rem; color:#666;">${item.unit}</span>
                     </div>
                 `;
             } else {
                 qtyControl = `
                     <div style="display:flex; align-items:center; border:1px solid #ddd; border-radius:4px; overflow:hidden;">
-                        <button class="btn-qty-change" data-idx="${idx}" data-change="-1" style="padding:5px 10px; border:none; background:#f8f9fa; cursor:pointer;">-</button>
-                        <span style="padding:0 10px; font-size:0.9rem; min-width:30px; text-align:center;">${item.qty}</span>
-                        <button class="btn-qty-change" data-idx="${idx}" data-change="1" style="padding:5px 10px; border:none; background:#f8f9fa; cursor:pointer;">+</button>
+                        <button class="qty-btn" data-idx="${idx}" data-chg="-1" style="width:30px; height:30px; border:1px solid #ddd; background:#fff; border-radius:5px; cursor:pointer; color:#333;">-</button>
+                        <input type="number" class="qty-input-direct" data-idx="${idx}" value="${item.qty}" min="1" step="1" max="${item.stock}" 
+                            style="width:50px; text-align:center; padding:5px; border:none; font-weight:bold; color:#1f2937; background:white;">
+                        <button class="qty-btn" data-idx="${idx}" data-chg="1" style="width:30px; height:30px; border:1px solid #ddd; background:#fff; border-radius:5px; cursor:pointer; color:#333;">+</button>
                     </div>
                 `;
             }
@@ -258,168 +316,132 @@ export async function setupShopLogic(router) {
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             ${qtyControl}
                             <div style="text-align:right; margin-left:10px;">
-                                <div style="font-weight:bold;">$${subtotal.toFixed(2)}</div>
-                                <small style="color:#999;">$${item.price}/${unit}</small>
+                                <div style="font-weight:bold; color:#1f2937;">$${subtotal.toFixed(2)}</div>
+                                <small style="color:#999;">$${item.price}/${item.unit}</small>
                             </div>
                         </div>
                     </div>
-                    <button class="btn-remove-item" data-idx="${idx}" style="margin-left:15px; color:#ef4444; border:none; background:transparent; cursor:pointer;">🗑️</button>
+                    <button class="rm-item" data-idx="${idx}" style="margin-left:15px; color:#ef4444; border:none; background:transparent; cursor:pointer;">🗑️</button>
                 </div>
             `;
         }).join('');
 
-        cartBody.innerHTML = `
+        body.innerHTML = `
             <div style="margin-bottom:20px;">${itemsHtml}</div>
-            
-            <div class="drawer-footer">
-                <div class="checkout-total">
-                    <span>Total Estimado:</span>
-                    <span>$${total.toFixed(2)}</span>
+            <div class="drawer-footer" style="margin-top:20px; padding-top:20px; border-top:2px solid #f3f4f6;">
+                <div class="checkout-total" style="display:flex; justify-content:space-between; font-size:1.3rem; font-weight:800; margin-bottom:25px; color:#1f2937;">
+                    <span>Total:</span><span>$${total.toFixed(2)}</span>
                 </div>
-                
                 <div class="form-checkout">
-                    <h4 style="margin-bottom:10px; color:#333;">Datos para recoger:</h4>
-                    <input type="text" id="client-name" placeholder="Tu Nombre Completo" required>
-                    <input type="text" id="client-phone" placeholder="Teléfono / WhatsApp" required>
-                    
-                    <label style="font-size:0.9rem; display:block; margin-top:10px;">¿Cómo pagarás?</label>
-                    <select id="payment-method" style="width:100%; padding:12px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px;">
-                        <option value="efectivo">💵 Efectivo</option>
-                        <option value="tarjeta">💳 Tarjeta</option>
+                    <input type="text" id="client-name" placeholder="Tu Nombre Completo" required style="width:100%; padding:14px; margin-bottom:10px; border:1px solid #ddd; border-radius:10px; background:white; color:#1f2937;">
+                    <input type="text" id="client-phone" placeholder="WhatsApp / Teléfono" required style="width:100%; padding:14px; margin-bottom:10px; border:1px solid #ddd; border-radius:10px; background:white; color:#1f2937;">
+                    <select id="payment-method" style="width:100%; padding:14px; margin-bottom:20px; border:1px solid #ddd; border-radius:10px; background:white; color:#1f2937;">
+                        <option value="efectivo">💵 Efectivo (Contra entrega)</option>
+                        <option value="tarjeta">💳 Tarjeta (En tienda)</option>
                         <option value="transferencia">📲 Transferencia</option>
                     </select>
-
-                    <button id="btn-checkout" class="btn-checkout">Confirmar Pedido</button>
+                    <button id="btn-checkout" class="btn-checkout" style="width:100%; padding:16px; background:${currentBusiness.primary_color || '#7A3F9D'}; color:white; border:none; border-radius:10px; font-weight:bold; font-size:1.1rem; cursor:pointer;">Confirmar Pedido</button>
                 </div>
             </div>
         `;
 
-        // Listeners
-        document.querySelectorAll('.btn-qty-change').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const idx = parseInt(e.target.dataset.idx);
-                const change = parseInt(e.target.dataset.change);
-                updateItemQty(idx, shopCart[idx].qty + change);
-            });
-        });
-
-        document.querySelectorAll('.qty-input-bulk').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const idx = parseInt(e.target.dataset.idx);
-                const val = parseFloat(e.target.value);
-                if(!isNaN(val)) updateItemQty(idx, val);
-            });
-        });
-
-        document.querySelectorAll('.btn-remove-item').forEach(b => {
-            b.addEventListener('click', (e) => {
-                shopCart.splice(e.target.dataset.idx, 1);
-                updateCartUI();
-                renderCartDrawer();
-            });
-        });
-
+        body.querySelectorAll('.qty-btn').forEach(b => b.addEventListener('click', e => updateItemQty(parseInt(e.target.dataset.idx), shopCart[parseInt(e.target.dataset.idx)].qty + parseInt(e.target.dataset.chg))));
+        body.querySelectorAll('.qty-input-direct, .qty-input-bulk').forEach(inp => inp.addEventListener('change', e => updateItemQty(parseInt(e.target.dataset.idx), parseFloat(e.target.value))));
+        body.querySelectorAll('.rm-item').forEach(b => b.addEventListener('click', e => { shopCart.splice(e.target.dataset.idx, 1); renderCartDrawer(); updateCartUI(); if(shopCart.length===0) document.getElementById('cart-overlay').style.display='none'; }));
         document.getElementById('btn-checkout').addEventListener('click', submitOrder);
     }
 
-    // --- 3. ENVIAR PEDIDO (FIXED RPC & BUSINESS_ID) ---
     async function submitOrder() {
-        const name = document.getElementById('client-name').value;
-        const phone = document.getElementById('client-phone').value;
-        const method = document.getElementById('payment-method').value; 
-        
-        if (!name || !phone) return alert("Por favor llena tus datos.");
+        const name = document.getElementById('client-name').value.trim();
+    const phone = document.getElementById('client-phone').value.trim();
+    const method = document.getElementById('payment-method').value;
 
-        const btn = document.getElementById('btn-checkout');
-        btn.textContent = "Procesando...";
-        btn.disabled = true;
+    if (!name || !phone) return alert("Por favor llena tus datos.");
 
-        const total = shopCart.reduce((acc, i) => acc + (i.price * i.qty), 0);
-        
-        // Preparar items limpios para guardar en JSONB
-        const itemsToSave = [...shopCart.map(i => ({
-            id: i.id,
-            name: i.name,
-            qty: i.qty,
-            unit: i.unit,
-            price: i.price
-        })), { type: 'meta', payment_method: method }];
+    const btn = document.getElementById('btn-checkout');
+    btn.textContent = "Procesando...";
+    btn.disabled = true;
 
-        // Preparar items limpios para el RPC (Stock)
-        const itemsForRpc = shopCart.map(item => ({
-            id: item.id,
-            qty: item.qty
-        }));
+    const total = shopCart.reduce((acc, i) => acc + (i.price * i.qty), 0);
 
-        const orderData = {
+    const itemsToSave = [
+        ...shopCart.map(i => ({ id: i.id, name: i.name, qty: i.qty, unit: i.unit, price: i.price })),
+        { type: 'meta', payment_method: method }
+    ];
+
+    try {
+        /* ---------------------------------------------------------
+           1. CREAR PEDIDO WEB
+        --------------------------------------------------------- */
+        const { error: orderError } = await supabase.from('web_orders').insert({
             customer_name: name,
             customer_contact: phone,
             items: itemsToSave,
             total: total,
             status: 'pendiente',
-            business_id: DEMO_BUSINESS_ID // <--- FIX CRÍTICO: ID DEL NEGOCIO
-        };
+            business_id: currentBusiness.id
+        });
 
-        try {
-            // A. Insertar Pedido
-            const { error: orderError } = await supabase.from('web_orders').insert(orderData);
-            if (orderError) throw orderError;
+        if (orderError) throw orderError;
 
-            // B. Restar Stock (RPC Nuevo) - Una sola llamada eficiente
-            const { error: rpcError } = await supabase.rpc('process_sale_inventory', { 
-                p_business_id: DEMO_BUSINESS_ID,
-                p_items: itemsForRpc
-            });
+        /* ---------------------------------------------------------
+           2. DESCONTAR STOCK DIRECTAMENTE (MULTI-TENANT SEGURO)
+        --------------------------------------------------------- */
+        for (const item of shopCart) {
+            const { data: product, error: prodError } = await supabase
+                .from('products')
+                .select('stock')
+                .eq('id', item.id)
+                .eq('business_id', currentBusiness.id)
+                .single();
 
-            if (rpcError) throw rpcError;
+            if (prodError || !product) {
+                throw new Error(`Producto no encontrado: ${item.name}`);
+            }
 
-            // C. Refrescar visualmente el stock en la tienda
-            await loadData(); 
+            if (product.stock < item.qty) {
+                throw new Error(`Stock insuficiente para ${item.name}`);
+            }
 
-            // D. Éxito
-            shopCart = [];
-            updateCartUI();
-            cartBody.innerHTML = `
-                <div class="success-view">
-                    <span class="success-icon">✅</span>
-                    <h3>¡Pedido Recibido!</h3>
-                    <p>Tu pedido ha sido reservado.</p>
-                    <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin:15px 0; text-align:left;">
-                        <p><strong>Cliente:</strong> ${name}</p>
-                        <p><strong>Pago:</strong> ${method.toUpperCase()}</p>
-                        <p><strong>Total:</strong> $${total.toFixed(2)}</p>
-                    </div>
-                    <p style="font-size:0.9rem; color:#666;">Pasa a recogerlo a la tienda.</p>
-                    <button id="btn-finish" class="btn-checkout" style="margin-top:20px;">Cerrar</button>
-                </div>
-            `;
-            document.getElementById('btn-finish').addEventListener('click', () => {
-                cartOverlay.style.display = 'none';
-            });
+            const { error: updateError } = await supabase
+                .from('products')
+                .update({ stock: product.stock - item.qty })
+                .eq('id', item.id)
+                .eq('business_id', currentBusiness.id);
 
-        } catch (err) {
-            console.error(err);
-            alert("Error al procesar pedido. Intenta de nuevo.");
-            btn.textContent = "Confirmar Pedido";
-            btn.disabled = false;
+            if (updateError) throw updateError;
         }
+
+        /* ---------------------------------------------------------
+           3. ÉXITO VISUAL
+        --------------------------------------------------------- */
+        shopCart = [];
+        updateCartUI();
+
+        const cartBody = document.getElementById('cart-body');
+        cartBody.innerHTML = `
+            <div class="success-view" style="text-align:center; padding:30px 10px;">
+                <div style="font-size:4rem; margin-bottom:10px;">✅</div>
+                <h2 style="margin-bottom:10px;">¡Pedido Recibido!</h2>
+                <p>Reservado en <strong>${currentBusiness.name}</strong></p>
+                <div style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:20px;">
+                    <p><strong>Cliente:</strong> ${name}</p>
+                    <p><strong>Total:</strong> $${total.toFixed(2)}</p>
+                </div>
+                <button id="btn-finish" style="width:100%; padding:15px; background:#111; color:white; border:none; border-radius:10px; font-weight:bold;">Cerrar</button>
+            </div>
+        `;
+
+        document.getElementById('btn-finish').addEventListener('click', () => {
+            document.getElementById('cart-overlay').style.display = 'none';
+            loadCatalog(currentBusiness.id);
+        });
+
+    } catch (err) {
+        console.error("🔥 Error en submitOrder:", err);
+        alert("Error: " + err.message);
+        btn.textContent = "Confirmar Pedido";
+        btn.disabled = false;
     }
-
-    // --- EVENTOS GENERALES ---
-    document.getElementById('btn-open-cart').addEventListener('click', () => {
-        if(shopCart.length === 0) return alert("Tu carrito está vacío");
-        cartOverlay.style.display = 'flex';
-        renderCartDrawer();
-    });
-
-    document.getElementById('btn-close-cart').addEventListener('click', () => {
-        cartOverlay.style.display = 'none';
-    });
-
-    cartOverlay.addEventListener('click', (e) => {
-        if (e.target === cartOverlay) cartOverlay.style.display = 'none';
-    });
-
-    // INICIO
-    loadData();
+    }
 }
