@@ -35,7 +35,7 @@ export const SettingsService = {
 
     applyToDOM() {
         // Actualizar Textos
-        document.querySelectorAll('.app-name').forEach(el => el.textContent = this.config.store_name);
+        document.querySelectorAll('.app-name').forEach(el => el.textContent = this.config.name);
         
         // Actualizar Logos
         document.querySelectorAll('.app-logo-img').forEach(img => {

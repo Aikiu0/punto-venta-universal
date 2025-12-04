@@ -1,5 +1,6 @@
-// src/modules/shop/shop.js - VERSIÓN DEBUG
+// src/modules/shop/shop.js
 import { supabase } from '../../data/supabase.js';
+import '../../css/shop.css'; 
 
 let shopCart = [];
 let shopProducts = [];
@@ -7,9 +8,12 @@ let currentBusiness = null;
 
 export function renderShop() {
     return `
-        <div id="shop-root" class="shop-layout" style="min-height:100vh; background:var(--bg-body); font-family:'Montserrat', sans-serif;">
-            <div class="loading-screen" style="padding:100px; text-align:center; color:var(--text-secondary);">
-                <h2>Cargando...</h2>
+        <div id="shop-root" class="shop-layout">
+            <div class="loading-screen" style="height:100vh; display:flex; align-items:center; justify-content:center; color:#64748b;">
+                <div style="text-align:center;">
+                    <div style="font-size:3rem; margin-bottom:10px;">🏪</div>
+                    <h2>Cargando Tienda...</h2>
+                </div>
             </div>
         </div>
     `;
@@ -18,115 +22,85 @@ export function renderShop() {
 // --- VISTA 1: MARKETPLACE ---
 function renderMarketplace() {
     return `
-        <div class="marketplace-wrapper" style="min-height:100vh; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding-bottom:50px;">
-            <div style="text-align:center; padding:60px 20px; color:white;">
-                <h1 style="font-size:3rem; margin-bottom:10px;">Bienvenido a ArchSell</h1>
-                <p style="font-size:1.2rem; opacity:0.9; max-width:600px; margin:0 auto;">La red de ferreterías más confiable.</p>
-                <div style="position:relative; max-width:600px; margin:40px auto 0;">
-                    <input type="text" id="store-finder" placeholder="Buscar ferretería..." 
-                        style="width:100%; padding:18px 20px; border-radius:50px; border:none; font-size:1.1rem; box-shadow:0 10px 30px rgba(0,0,0,0.2); outline:none; color:#333;">
+        <div class="marketplace-wrapper">
+            <div class="marketplace-header">
+                <h1 class="marketplace-title">Bienvenido a ArchSell</h1>
+                <p class="marketplace-subtitle">Descubre las mejores ferreterías y proveedores cerca de ti.</p>
+                <div class="search-container">
+                    <input type="text" id="store-finder" class="store-search-input" placeholder="🔍 Buscar ferretería...">
                 </div>
             </div>
-            <div class="marketplace-container" style="max-width:1000px; margin:0 auto; padding:20px;">
-                <h3 style="color:white; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;">Tiendas Disponibles</h3>
-                <div id="stores-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:25px;">
-                    <p style="color:white;">Cargando tiendas...</p>
+            
+            <div class="marketplace-container">
+                <h3 style="text-align:center; color:white; margin-bottom:30px; opacity:0.8; text-transform:uppercase; letter-spacing:1px; font-size:0.9rem;">Tiendas Oficiales</h3>
+                <div id="stores-grid" class="stores-grid">
+                    <p style="color:white; text-align:center; grid-column:1/-1;">Buscando tiendas disponibles...</p>
                 </div>
             </div>
         </div>
     `;
 }
 
-// --- VISTA 2: TIENDA ---
+// --- VISTA 2: TIENDA INDIVIDUAL ---
 function renderStoreUI(business) {
     const logo = business.logo_url || '';
-    const name = business.name || 'Tienda';
+    const name = business.name || '';
     const color = business.primary_color || '#7A3F9D'; 
     
     return `
         <div class="shop-layout">
-            <header class="shop-header" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; background:white; padding:15px 20px; box-shadow:0 2px 10px rgba(0,0,0,0.05); position:sticky; top:0; z-index:100;">
+            <header class="shop-header">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    ${logo ? `<img src="${logo}" style="height: 45px; width:auto; border-radius: 5px;">` : ''}
+                    ${logo ? `<img src="${logo}" style="height: 40px; width:40px; border-radius: 8px; object-fit:cover;">` : '<span style="font-size:2rem;">🏪</span>'}
                     <div>
-                        <a href="#/shop?s=${business.slug}" style="text-decoration: none; color: #1f2937; font-weight: 800; font-size: 1.2rem; line-height:1.2; display:block;">${name}</a>
-                        <a href="#/shop" style="font-size:0.85rem; color:#6b7280; text-decoration:none;">← Directorio</a>
+                        <a href="#/shop?s=${business.slug}" style="text-decoration: none; color: #1e293b; font-weight: 800; font-size: 1.1rem; line-height:1.2; display:block;">${name}</a>
+                        <a href="#/shop" style="font-size:0.8rem; color:#64748b; text-decoration:none; font-weight:600;">← Volver al directorio</a>
                     </div>
                 </div>
-                <nav class="shop-nav" style="display:flex; align-items:center;">
-                    <button id="btn-open-cart" class="btn-cart-float" style="
-    border:none;
-    cursor:pointer;
-    background:${color};
-    color:white;
-    width:56px;
-    height:56px;
-    border-radius:50%;
-    font-size:1.4rem;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    position:relative;
-    box-shadow:0 6px 18px rgba(0,0,0,0.25);
-    transition:transform 0.2s;
-">
-    🛒
-    <span id="cart-count" style="
-        position:absolute;
-        top:-6px;
-        right:-6px;
-        min-width:20px;
-        height:20px;
-        background:#ef4444;
-        color:white;
-        border-radius:50%;
-        font-size:0.7rem;
-        font-weight:800;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        padding:2px;
-        box-shadow:0 2px 6px rgba(0,0,0,0.3);
-    ">0</span>
-</button>
+                <nav class="shop-nav">
+                    <button id="btn-open-cart" class="btn-cart-float" style="background:${color}">
+                        🛒
+                        <span id="cart-count" class="cart-badge">0</span>
+                    </button>
                 </nav>
             </header>
 
-            <div class="shop-hero" style="background: linear-gradient(135deg, ${color} 0%, #1e293b 100%); padding:60px 20px; text-align:center; color:white;">
-                <h1 style="margin:0; font-size:2.5rem; text-shadow:0 2px 5px rgba(0,0,0,0.2);">Catálogo en Línea</h1>
-                <p style="opacity:0.95; font-size:1.1rem; margin-top:10px;">Haz tu pedido y pasa a recoger.</p>
+            <div style="background: linear-gradient(135deg, ${color} 0%, #1e293b 100%); padding:40px 20px; text-align:center; color:white;">
+                <h1 style="margin:0; font-size:2rem; font-weight:800;">Catálogo Digital</h1>
+                <p style="opacity:0.9; margin-top:5px;">Haz tu pedido en línea y recoge en tienda.</p>
             </div>
 
-            <div class="shop-container" style="padding:40px 20px; max-width:1200px; margin:0 auto; display:grid; grid-template-columns: 220px 1fr; gap:40px;">
-                <aside class="shop-filters" style="display:block;">
-                    <div style="background:white; padding:20px; border-radius:12px; box-shadow:0 2px 15px rgba(0,0,0,0.03);">
-                        <span style="font-weight:bold; display:block; margin-bottom:15px; font-size:1.1rem; color:#333;">Categorías</span>
+            <div class="shop-container">
+                
+                <aside class="shop-filters">
+                     <div style="background:white; padding:20px; border-radius:12px; border:1px solid #e2e8f0; position:sticky; top:100px;">
+                        <span style="font-weight:bold; display:block; margin-bottom:15px; color:#1e293b;">Categorías</span>
                         <ul id="shop-categories" style="list-style:none; padding:0; margin:0;">
-                            <li class="category-item active" data-cat="all" style="padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; background:#f3f4f6; color:#333; font-weight:bold;">Todas</li>
-                        </ul>
+                             </ul>
                     </div>
                 </aside>
+
                 <main>
-                    <div id="shop-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:25px;">
+                    <div style="margin-bottom:20px; position:relative;">
+                        <input type="text" id="product-search" placeholder="🔍 ¿Qué estás buscando?" 
+                            style="width:100%; padding:15px 20px; border-radius:12px; border:1px solid #e2e8f0; font-size:1rem; box-shadow:0 2px 5px rgba(0,0,0,0.02); outline:none;">
+                    </div>
+
+                    <div id="shop-grid" class="products-grid-shop">
                         <p style="grid-column: 1/-1; text-align: center; padding: 50px; color:#666;">Cargando productos...</p>
                     </div>
                 </main>
             </div>
 
             <div class="shop-modal-overlay" id="cart-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:flex-end; backdrop-filter:blur(2px);">
-                <div class="shop-drawer" style="background:white; width:100%; max-width:450px; height:100%; display:flex; flex-direction:column; box-shadow:-5px 0 30px rgba(0,0,0,0.2); color:#333;">
-                    
-                    <div class="drawer-header" style="padding:20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; flex-shrink:0;">
-                        <div class="drawer-title" style="font-weight:bold; font-size:1.2rem; color:#111;">Tu Pedido</div>
-                        <button id="btn-close-cart" style="background:none; border:none; font-size:2rem; cursor:pointer; color:#666; line-height:1;">&times;</button>
+                <div class="shop-drawer" style="background:white; width:100%; max-width:450px; height:100%; display:flex; flex-direction:column; box-shadow:-5px 0 30px rgba(0,0,0,0.2);">
+                    <div class="drawer-header" style="padding:20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; background:#f8f9fa;">
+                        <div style="font-weight:bold; font-size:1.2rem;">Tu Pedido</div>
+                        <button id="btn-close-cart" style="background:none; border:none; font-size:2rem; cursor:pointer; line-height:1;">&times;</button>
                     </div>
-                    
                     <div class="drawer-body" id="cart-body" style="flex:1; overflow-y:auto; padding:20px;"></div>
                 </div>
             </div>
-            <style>
-                @media(max-width:768px) { .shop-container { grid-template-columns: 1fr; } .shop-filters { display:none !important; } }
-            </style>
         </div>
     `;
 }
@@ -146,19 +120,27 @@ export async function setupShopLogic(router) {
     async function setupMarketplaceLogic() {
         const grid = document.getElementById('stores-grid');
         const search = document.getElementById('store-finder');
-        const { data: stores } = await supabase.from('businesses').select('id, name, slug, logo_url, primary_color').limit(50);
+        
+        const { data: stores } = await supabase
+            .from('businesses')
+            .select('id, name, slug, logo_url, primary_color, plan')
+            .eq('plan', 'empresarial')
+            .limit(50);
         
         function renderStoreCards(list) {
-            if(!list || list.length === 0) return grid.innerHTML = '<p style="color:white;">No se encontraron tiendas.</p>';
+            if(!list || list.length === 0) {
+                return grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px; color:rgba(255,255,255,0.7);"><h3>😕 No se encontraron tiendas</h3></div>`;
+            }
             grid.innerHTML = list.map(s => `
-                <div onclick="window.location.hash='#/shop?s=${s.slug}'; location.reload();" 
-                     style="background:white; border-radius:16px; padding:25px; text-align:center; cursor:pointer; transition:transform 0.2s; box-shadow:0 4px 15px rgba(0,0,0,0.1); position:relative; overflow:hidden;">
-                    <div style="position:absolute; top:0; left:0; width:100%; height:6px; background:${s.primary_color || '#7A3F9D'};"></div>
-                    <div style="height:80px; display:flex; align-items:center; justify-content:center; margin-bottom:15px;">
-                        ${s.logo_url ? `<img src="${s.logo_url}" style="max-height:70px; max-width:100%; object-fit:contain;">` : '<span style="font-size:3.5rem;">🏪</span>'}
+                <div class="store-card" onclick="window.location.hash='#/shop?s=${s.slug}'; location.reload();">
+                    <div class="store-card-header" style="background:${s.primary_color || '#7A3F9D'};"></div>
+                    <div class="store-card-body">
+                        <div class="store-logo-wrapper">
+                            ${s.logo_url ? `<img src="${s.logo_url}" class="store-logo-img">` : `<span class="store-placeholder">🏪</span>`}
+                        </div>
+                        <h3 class="store-name">${s.name}</h3>
+                        <span class="store-link">Ver Catálogo &rarr;</span>
                     </div>
-                    <h3 style="margin:0 0 5px 0; font-size:1.2rem; color:#1f2937; font-weight:bold;">${s.name}</h3>
-                    <p style="margin:0; color:#6b7280; font-size:0.9rem;">Ver catálogo &rarr;</p>
                 </div>
             `).join('');
         }
@@ -169,68 +151,107 @@ export async function setupShopLogic(router) {
     async function loadStore(slug) {
         try {
             const { data: business, error } = await supabase.from('businesses').select('*').eq('slug', slug).single();
-            if (error || !business) {
-                root.innerHTML = `<div style="text-align:center; padding:100px; color:#fff;"><h2>🚫 Tienda no encontrada</h2><a href="#/shop" style="color:#4ade80;">Volver al directorio</a></div>`;
-                return;
-            }
+            if (error || !business) return renderError("Tienda no encontrada.");
+            if (business.plan !== 'empresarial') return renderError("Esta tienda no tiene habilitada la venta en línea.");
+
             currentBusiness = business;
             root.innerHTML = renderStoreUI(business);
+            
+            // Listeners iniciales
             setupStoreInteractions();
-            loadCatalog(business.id);
-        } catch (err) { console.error(err); }
+            
+            // Cargar datos
+            await loadCatalog(business.id);
+
+            // CORRECCIÓN: Listener para el buscador de productos
+            document.getElementById('product-search').addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                const filtered = shopProducts.filter(p => p.name.toLowerCase().includes(term));
+                renderProducts(filtered);
+            });
+
+        } catch (err) { console.error(err); renderError("Error al cargar."); }
+    }
+
+    function renderError(msg) {
+        root.innerHTML = `<div style="text-align:center; padding:50px;"><h2>🚫</h2><p>${msg}</p><a href="#/shop">Volver</a></div>`;
     }
 
     async function loadCatalog(businessId) {
+        // CORRECCIÓN: Cargar categorías y productos
         const { data: cats } = await supabase.from('categories').select('*').eq('business_id', businessId);
         const { data: prods } = await supabase.from('products').select('*').eq('business_id', businessId).gt('stock', 0);
         shopProducts = prods || [];
+        
+        // Renderizar Productos
         renderProducts(shopProducts);
         
-        if (cats) {
+        // Renderizar Categorías
+        if (cats && cats.length > 0) {
             const catList = document.getElementById('shop-categories');
-            catList.innerHTML = `<li class="category-item active" data-cat="all" style="padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; background:#e5e7eb; color:#333; font-weight:bold;">Todas</li>`;
-            cats.forEach(c => {
-                const li = document.createElement('li');
-                li.className = 'category-item'; li.textContent = c.name;
-                li.style.cssText = "padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; color:#666; transition:0.2s;";
-                li.addEventListener('click', () => {
-                    document.querySelectorAll('.category-item').forEach(i => {i.style.background='transparent'; i.style.fontWeight='normal'; i.style.color='#666';});
-                    li.style.background = '#e5e7eb'; li.style.fontWeight='bold'; li.style.color='#333';
-                    renderProducts(shopProducts.filter(p => p.category === c.name));
+            if (catList) {
+                // Opción "Todas"
+                catList.innerHTML = `<li class="category-item active" data-cat="all" style="padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; background:#e5e7eb; color:#333; font-weight:bold;">Todas</li>`;
+                
+                cats.forEach(c => {
+                    const li = document.createElement('li');
+                    li.className = 'category-item'; 
+                    li.textContent = c.name;
+                    li.style.cssText = "padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; color:#64748b; transition:0.2s;";
+                    
+                    li.addEventListener('click', () => {
+                        // Reset estilos
+                        document.querySelectorAll('.category-item').forEach(i => {
+                            i.style.background='transparent'; i.style.fontWeight='normal'; i.style.color='#64748b';
+                        });
+                        // Activar actual
+                        li.style.background = '#e5e7eb'; li.style.fontWeight='bold'; li.style.color='#333';
+                        // Filtrar
+                        renderProducts(shopProducts.filter(p => p.category === c.name));
+                    });
+                    catList.appendChild(li);
                 });
-                catList.appendChild(li);
-            });
-            catList.querySelector('[data-cat="all"]').addEventListener('click', (e) => {
-                document.querySelectorAll('.category-item').forEach(i => {i.style.background='transparent'; i.style.fontWeight='normal'; i.style.color='#666';});
-                e.target.style.background = '#e5e7eb'; e.target.style.fontWeight='bold'; e.target.style.color='#333';
-                renderProducts(shopProducts);
-            });
+
+                // Listener para "Todas"
+                catList.querySelector('[data-cat="all"]').addEventListener('click', (e) => {
+                    document.querySelectorAll('.category-item').forEach(i => {
+                        i.style.background='transparent'; i.style.fontWeight='normal'; i.style.color='#64748b';
+                    });
+                    e.target.style.background = '#e5e7eb'; e.target.style.fontWeight='bold'; e.target.style.color='#333';
+                    renderProducts(shopProducts);
+                });
+            }
         }
     }
 
     function renderProducts(products) {
         const grid = document.getElementById('shop-grid');
         grid.innerHTML = '';
-        if (products.length === 0) return grid.innerHTML = `<p style="text-align:center; width:100%; color:#666;">No hay productos disponibles.</p>`;
+        if (products.length === 0) return grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color:#666;">No se encontraron productos.</p>`;
 
         products.forEach(p => {
             const card = document.createElement('div');
             card.className = 'shop-card';
-            card.style.cssText = "background:white; border:1px solid #eee; border-radius:12px; overflow:hidden; transition:transform 0.2s; display:flex; flex-direction:column; box-shadow:0 2px 8px rgba(0,0,0,0.05);";
             const unit = p.unit || 'pz';
-            const bulkBadge = p.is_bulk ? `<span style="font-size:0.7rem; background:#e0f2fe; color:#0284c7; padding:2px 6px; border-radius:4px; font-weight:bold;">GRANEL</span>` : '';
+            const bulkBadge = p.is_bulk ? `<span style="font-size:0.65rem; background:#e0f2fe; color:#0284c7; padding:2px 6px; border-radius:4px; font-weight:bold;">GRANEL</span>` : '';
 
+            // CORRECCIÓN: Se agregó la línea "Disponible: X"
             card.innerHTML = `
-                <div style="height:160px; background:#f8fafc; display:flex; align-items:center; justify-content:center; font-size:3.5rem;">📦</div>
+                <div style="height:140px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:3rem;">📦</div>
                 <div style="padding:15px; flex:1; display:flex; flex-direction:column;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                        <span style="font-size:0.75rem; color:#9ca3af; text-transform:uppercase; font-weight:bold; letter-spacing:0.5px;">${p.category || 'General'}</span>${bulkBadge}
+                        <span style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; font-weight:bold;">${p.category || 'General'}</span>${bulkBadge}
                     </div>
-                    <h3 style="margin:0 0 5px 0; font-size:1.1rem; color:#1f2937; font-weight:700; line-height:1.3;">${p.name}</h3>
+                    <h3 style="margin:0 0 5px 0; font-size:1rem; color:#0f172a; font-weight:700; line-height:1.4;">${p.name}</h3>
+                    
                     <div style="margin-top:auto;">
-                        <div style="font-size:1.4rem; font-weight:800; color:#10b981; margin:5px 0;">$${p.price.toFixed(2)} <span style="font-size:0.8rem; color:#9ca3af; font-weight:normal;">/${unit}</span></div>
-                        <small style="color:#6b7280; display:block; margin-bottom:10px;">Disponible: <b>${p.stock}</b></small>
-                        <button class="btn-add" style="width:100%; padding:12px; background:${currentBusiness.primary_color || '#7A3F9D'}; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; transition:0.2s;">Agregar al Carrito</button>
+                        <div style="font-size:0.8rem; color:#64748b; margin-bottom:5px;">
+                            Disponible: <span style="font-weight:bold; color:#333;">${p.stock}</span>
+                        </div>
+                        <div style="font-size:1.3rem; font-weight:800; color:#10b981; margin-bottom:10px;">
+                            $${p.price.toFixed(2)} <span style="font-size:0.75rem; color:#9ca3af; font-weight:normal;">/${unit}</span>
+                        </div>
+                        <button class="btn-add" style="width:100%; padding:10px; background:${currentBusiness.primary_color || '#7A3F9D'}; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; transition:0.2s;">Agregar +</button>
                     </div>
                 </div>
             `;
@@ -257,9 +278,7 @@ export async function setupShopLogic(router) {
         updateCartUI();
         renderCartDrawer();
         const btn = document.getElementById('btn-open-cart');
-        if (btn) {
-        btn.style.transform = 'scale(1.15)';
-        setTimeout(() => btn.style.transform = 'scale(1)', 150);}
+        if (btn) { btn.style.transform = 'scale(1.2)'; setTimeout(() => btn.style.transform = 'scale(1)', 150); }
     }
 
     function updateCartUI() {
@@ -296,55 +315,51 @@ export async function setupShopLogic(router) {
                     <div style="display:flex; align-items:center; gap:5px;">
                         <input type="number" class="qty-input-bulk" data-idx="${idx}" value="${item.qty}" step="0.1" min="0.1" style="width:60px; padding:5px; text-align:center; border:1px solid #ddd; border-radius:4px;">
                         <span style="font-size:0.8rem; color:#666;">${item.unit}</span>
-                    </div>
-                `;
+                    </div>`;
             } else {
                 qtyControl = `
                     <div style="display:flex; align-items:center; border:1px solid #ddd; border-radius:4px; overflow:hidden;">
-                        <button class="qty-btn" data-idx="${idx}" data-chg="-1" style="width:30px; height:30px; border:1px solid #ddd; background:#fff; border-radius:5px; cursor:pointer; color:#333;">-</button>
-                        <input type="number" class="qty-input-direct" data-idx="${idx}" value="${item.qty}" min="1" step="1" max="${item.stock}" 
-                            style="width:50px; text-align:center; padding:5px; border:none; font-weight:bold; color:#1f2937; background:white;">
-                        <button class="qty-btn" data-idx="${idx}" data-chg="1" style="width:30px; height:30px; border:1px solid #ddd; background:#fff; border-radius:5px; cursor:pointer; color:#333;">+</button>
-                    </div>
-                `;
+                        <button class="qty-btn" data-idx="${idx}" data-chg="-1" style="width:28px; height:28px; border:none; background:#f1f5f9; cursor:pointer;">-</button>
+                        <input type="number" class="qty-input-direct" data-idx="${idx}" value="${item.qty}" min="1" step="1" max="${item.stock}" style="width:40px; text-align:center; border:none; font-weight:bold;">
+                        <button class="qty-btn" data-idx="${idx}" data-chg="1" style="width:28px; height:28px; border:none; background:#f1f5f9; cursor:pointer;">+</button>
+                    </div>`;
             }
 
             return `
-                <div class="cart-item-row">
-                    <div class="cart-item-info" style="flex:1;">
-                        <h4 style="margin:0 0 5px 0;">${item.name}</h4>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
+                    <div style="flex:1;">
+                        <h4 style="margin:0 0 5px 0; font-size:0.95rem;">${item.name}</h4>
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             ${qtyControl}
                             <div style="text-align:right; margin-left:10px;">
-                                <div style="font-weight:bold; color:#1f2937;">$${subtotal.toFixed(2)}</div>
-                                <small style="color:#999;">$${item.price}/${item.unit}</small>
+                                <div style="font-weight:bold;">$${subtotal.toFixed(2)}</div>
                             </div>
                         </div>
                     </div>
-                    <button class="rm-item" data-idx="${idx}" style="margin-left:15px; color:#ef4444; border:none; background:transparent; cursor:pointer;">🗑️</button>
+                    <button class="rm-item" data-idx="${idx}" style="margin-left:10px; color:#ef4444; border:none; background:transparent; cursor:pointer; font-size:1.2rem;">&times;</button>
                 </div>
             `;
         }).join('');
 
         body.innerHTML = `
             <div style="margin-bottom:20px;">${itemsHtml}</div>
-            <div class="drawer-footer" style="margin-top:20px; padding-top:20px; border-top:2px solid #f3f4f6;">
-                <div class="checkout-total" style="display:flex; justify-content:space-between; font-size:1.3rem; font-weight:800; margin-bottom:25px; color:#1f2937;">
+            <div style="margin-top:20px; padding-top:20px; border-top:2px solid #f3f4f6;">
+                <div style="display:flex; justify-content:space-between; font-size:1.2rem; font-weight:800; margin-bottom:25px; color:#1e293b;">
                     <span>Total:</span><span>$${total.toFixed(2)}</span>
                 </div>
                 <div class="form-checkout">
-                    <input type="text" id="client-name" placeholder="Tu Nombre Completo" required style="width:100%; padding:14px; margin-bottom:10px; border:1px solid #ddd; border-radius:10px; background:white; color:#1f2937;">
-                    <input type="text" id="client-phone" placeholder="WhatsApp / Teléfono" required style="width:100%; padding:14px; margin-bottom:10px; border:1px solid #ddd; border-radius:10px; background:white; color:#1f2937;">
-                    <select id="payment-method" style="width:100%; padding:14px; margin-bottom:20px; border:1px solid #ddd; border-radius:10px; background:white; color:#1f2937;">
+                    <input type="text" id="client-name" placeholder="Tu Nombre Completo" required style="width:100%; padding:14px; margin-bottom:10px; border:1px solid #e2e8f0; border-radius:10px;">
+                    <input type="text" id="client-phone" placeholder="WhatsApp / Teléfono" required style="width:100%; padding:14px; margin-bottom:10px; border:1px solid #e2e8f0; border-radius:10px;">
+                    <select id="payment-method" style="width:100%; padding:14px; margin-bottom:20px; border:1px solid #e2e8f0; border-radius:10px;">
                         <option value="efectivo">💵 Efectivo (Contra entrega)</option>
                         <option value="tarjeta">💳 Tarjeta (En tienda)</option>
                         <option value="transferencia">📲 Transferencia</option>
                     </select>
-                    <button id="btn-checkout" class="btn-checkout" style="width:100%; padding:16px; background:${currentBusiness.primary_color || '#7A3F9D'}; color:white; border:none; border-radius:10px; font-weight:bold; font-size:1.1rem; cursor:pointer;">Confirmar Pedido</button>
+                    <button id="btn-checkout" style="width:100%; padding:16px; background:${currentBusiness.primary_color || '#7A3F9D'}; color:white; border:none; border-radius:10px; font-weight:bold; font-size:1.1rem; cursor:pointer;">Confirmar Pedido</button>
                 </div>
             </div>
         `;
-
+        
         body.querySelectorAll('.qty-btn').forEach(b => b.addEventListener('click', e => updateItemQty(parseInt(e.target.dataset.idx), shopCart[parseInt(e.target.dataset.idx)].qty + parseInt(e.target.dataset.chg))));
         body.querySelectorAll('.qty-input-direct, .qty-input-bulk').forEach(inp => inp.addEventListener('change', e => updateItemQty(parseInt(e.target.dataset.idx), parseFloat(e.target.value))));
         body.querySelectorAll('.rm-item').forEach(b => b.addEventListener('click', e => { shopCart.splice(e.target.dataset.idx, 1); renderCartDrawer(); updateCartUI(); if(shopCart.length===0) document.getElementById('cart-overlay').style.display='none'; }));
@@ -353,95 +368,44 @@ export async function setupShopLogic(router) {
 
     async function submitOrder() {
         const name = document.getElementById('client-name').value.trim();
-    const phone = document.getElementById('client-phone').value.trim();
-    const method = document.getElementById('payment-method').value;
+        const phone = document.getElementById('client-phone').value.trim();
+        const method = document.getElementById('payment-method').value;
 
-    if (!name || !phone) return alert("Por favor llena tus datos.");
+        if (!name || !phone) return alert("Por favor llena tus datos.");
 
-    const btn = document.getElementById('btn-checkout');
-    btn.textContent = "Procesando...";
-    btn.disabled = true;
+        const btn = document.getElementById('btn-checkout');
+        btn.textContent = "Procesando..."; btn.disabled = true;
 
-    const total = shopCart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+        const total = shopCart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+        const itemsToSave = [...shopCart.map(i => ({ id: i.id, name: i.name, qty: i.qty, unit: i.unit, price: i.price })), { type: 'meta', payment_method: method }];
 
-    const itemsToSave = [
-        ...shopCart.map(i => ({ id: i.id, name: i.name, qty: i.qty, unit: i.unit, price: i.price })),
-        { type: 'meta', payment_method: method }
-    ];
+        try {
+            const { error: orderError } = await supabase.from('web_orders').insert({
+                customer_name: name, customer_contact: phone, items: itemsToSave, total: total, status: 'pendiente', business_id: currentBusiness.id
+            });
+            if (orderError) throw orderError;
 
-    try {
-        /* ---------------------------------------------------------
-           1. CREAR PEDIDO WEB
-        --------------------------------------------------------- */
-        const { error: orderError } = await supabase.from('web_orders').insert({
-            customer_name: name,
-            customer_contact: phone,
-            items: itemsToSave,
-            total: total,
-            status: 'pendiente',
-            business_id: currentBusiness.id
-        });
-
-        if (orderError) throw orderError;
-
-        /* ---------------------------------------------------------
-           2. DESCONTAR STOCK DIRECTAMENTE (MULTI-TENANT SEGURO)
-        --------------------------------------------------------- */
-        for (const item of shopCart) {
-            const { data: product, error: prodError } = await supabase
-                .from('products')
-                .select('stock')
-                .eq('id', item.id)
-                .eq('business_id', currentBusiness.id)
-                .single();
-
-            if (prodError || !product) {
-                throw new Error(`Producto no encontrado: ${item.name}`);
+            for (const item of shopCart) {
+                const { data: product } = await supabase.from('products').select('stock').eq('id', item.id).single();
+                if (product) {
+                    await supabase.from('products').update({ stock: product.stock - item.qty }).eq('id', item.id);
+                }
             }
 
-            if (product.stock < item.qty) {
-                throw new Error(`Stock insuficiente para ${item.name}`);
-            }
+            shopCart = []; updateCartUI();
+            const cartBody = document.getElementById('cart-body');
+            cartBody.innerHTML = `
+                <div style="text-align:center; padding:40px 20px;">
+                    <div style="font-size:4rem; margin-bottom:10px;">✅</div>
+                    <h2 style="margin-bottom:10px;">¡Listo!</h2>
+                    <p>Tu pedido ha sido recibido en <strong>${currentBusiness.name}</strong>.</p>
+                    <button id="btn-finish" style="width:100%; padding:15px; background:#1e293b; color:white; border:none; border-radius:10px; font-weight:bold; margin-top:20px;">Cerrar</button>
+                </div>`;
+            document.getElementById('btn-finish').addEventListener('click', () => { document.getElementById('cart-overlay').style.display = 'none'; loadCatalog(currentBusiness.id); });
 
-            const { error: updateError } = await supabase
-                .from('products')
-                .update({ stock: product.stock - item.qty })
-                .eq('id', item.id)
-                .eq('business_id', currentBusiness.id);
-
-            if (updateError) throw updateError;
+        } catch (err) {
+            console.error(err); alert("Error al procesar pedido.");
+            btn.textContent = "Confirmar Pedido"; btn.disabled = false;
         }
-
-        /* ---------------------------------------------------------
-           3. ÉXITO VISUAL
-        --------------------------------------------------------- */
-        shopCart = [];
-        updateCartUI();
-
-        const cartBody = document.getElementById('cart-body');
-        cartBody.innerHTML = `
-            <div class="success-view" style="text-align:center; padding:30px 10px;">
-                <div style="font-size:4rem; margin-bottom:10px;">✅</div>
-                <h2 style="margin-bottom:10px;">¡Pedido Recibido!</h2>
-                <p>Reservado en <strong>${currentBusiness.name}</strong></p>
-                <div style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:20px;">
-                    <p><strong>Cliente:</strong> ${name}</p>
-                    <p><strong>Total:</strong> $${total.toFixed(2)}</p>
-                </div>
-                <button id="btn-finish" style="width:100%; padding:15px; background:#111; color:white; border:none; border-radius:10px; font-weight:bold;">Cerrar</button>
-            </div>
-        `;
-
-        document.getElementById('btn-finish').addEventListener('click', () => {
-            document.getElementById('cart-overlay').style.display = 'none';
-            loadCatalog(currentBusiness.id);
-        });
-
-    } catch (err) {
-        console.error("🔥 Error en submitOrder:", err);
-        alert("Error: " + err.message);
-        btn.textContent = "Confirmar Pedido";
-        btn.disabled = false;
-    }
     }
 }

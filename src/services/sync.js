@@ -1,4 +1,4 @@
-// src/services/sync.js - VERSIÓN FINAL (Corrección de columnas 'date' y 'payment')
+// src/services/sync.js - VERSIÓN CORREGIDA (Fix error uuid PGRST204)
 import { supabase } from '../data/supabase.js';
 import { db } from '../data/db-local.js';
 
@@ -37,16 +37,23 @@ export const syncService = {
 
         for (const sale of pendingSales) {
             try {
-                // --- PASO 1: TRADUCCIÓN DE DATOS (El arreglo vital) ---
-                // Sacamos los campos que Dexie usa pero Supabase NO quiere con ese nombre
-                const { id, sync_status, items_rpc, payment, date, ...restOfSale } = sale;
+                // --- PASO 1: LIMPIEZA DE DATOS (CORREGIDO) ---
+                // Importante: Agregamos 'uuid' a la desestructuración para SACARLO del objeto.
+                // Al ponerlo aquí, se queda en la variable 'uuid' y NO pasa a 'restOfSale'.
+                const { 
+                    id, 
+                    uuid,         // <--- ESTA ES LA CORRECCIÓN CLAVE
+                    sync_status, 
+                    items_rpc, 
+                    payment, 
+                    date, 
+                    ...restOfSale // Aquí queda solo lo que coincide con tu tabla 'sales' real
+                } = sale;
                 
                 // Construimos el objeto EXACTO que pide Supabase
                 const saleToInsert = {
                     ...restOfSale,
-                    // Traducimos 'payment' (JS) -> 'payment_data' (SQL)
                     payment_data: payment, 
-                    // Traducimos 'date' (JS) -> 'created_at' (SQL) <--- AQUÍ ESTABA EL ERROR
                     created_at: new Date(date).toISOString(),
                     items: sale.items,
                     business_id: businessId
@@ -57,12 +64,12 @@ export const syncService = {
 
                 if (insertError) {
                     console.error("Error insertando venta:", insertError);
-                    // Si falla la inserción, NO seguimos con el stock para evitar desastres
+                    // Si falla la inserción por duplicado, podrías marcarla como synced opcionalmente
+                    // if (insertError.code === '23505') ...
                     continue; 
                 }
 
-                // --- PASO 2: RESTAR STOCK (Directo JS - Fuerza Bruta) ---
-                // Usamos items_rpc (del POS) o mapeamos al vuelo
+                // --- PASO 2: RESTAR STOCK (Lógica existente) ---
                 const itemsToUpdate = items_rpc || sale.items.map(i => ({
                     id: i.id,
                     qty: Number(i.cantidad || i.qty || 1)
@@ -71,8 +78,7 @@ export const syncService = {
                 console.log("📉 Restando stock para:", itemsToUpdate);
 
                 for (const item of itemsToUpdate) {
-                    // A. Leer stock actual de la nube
-                    const { data: productNow, error: readError } = await supabase
+                    const { data: productNow } = await supabase
                         .from('products')
                         .select('stock')
                         .eq('id', item.id)
@@ -81,7 +87,6 @@ export const syncService = {
                     if (productNow) {
                         const nuevoStock = productNow.stock - item.qty;
                         
-                        // B. Escribir nuevo stock
                         await supabase
                             .from('products')
                             .update({ stock: nuevoStock })
@@ -90,7 +95,7 @@ export const syncService = {
                 }
 
                 // --- PASO 3: ÉXITO ---
-                // Marcamos como sincronizado en local
+                // Marcamos como sincronizado en local usando el ID original de Dexie
                 await db.sales.update(id, { sync_status: 'synced' });
 
             } catch (err) {
@@ -131,6 +136,8 @@ export const syncService = {
                 date: new Date(s.created_at), // Mapeo inverso de fecha
                 sync_status: 'synced'
             }));
+            
+            // Usamos transacción para asegurar integridad
             await db.transaction('rw', db.sales, async () => {
                 await db.sales.bulkPut(salesFormatted);
             });

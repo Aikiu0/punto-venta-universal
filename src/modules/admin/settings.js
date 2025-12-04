@@ -1,23 +1,42 @@
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
-import { SettingsService } from '../../services/settings.js'; // <--- ¡IMPORTANTE!
-
+import { SettingsService } from '../../services/settings.js'; 
+import { PermissionService } from '../../services/permissions.js';
+import { renderSidebarHeader } from './components/sidebarHeader.js';
 export function renderAdminSettings() {
     const s = SettingsService.get();
+
+    // 1. Candados de Upselling para el menú lateral
+    const lockHistory = PermissionService.can('history') ? '' : '🔒 ';
+    const lockOrders = PermissionService.can('web_orders') ? '' : '🔒 ';
+    const lockSuppliers = PermissionService.can('suppliers') ? '' : '🔒 ';
+    const lockBilling = PermissionService.can('billing') ? '' : '🔒 ';
+    // Usamos s.name y s.logo_url con valores por defecto para evitar errores visuales
+    const logoUrl = s.logo_url || '';
+    const name = s.name || s.name || 'Mi Negocio';
 
     return `
         <div class="admin-container">
             <aside class="admin-sidebar">
                 <div class="sidebar-logo">
-                    <img src="${s.logo_url}" class="app-logo-img" style="width:40px; height:40px; object-fit:contain; display:${s.logo_url?'block':'none'}">
-                    <span class="app-name">${s.store_name}</span>
+                    ${renderSidebarHeader()}
                 </div>
                 <nav class="sidebar-menu">
                     <button class="menu-item" id="nav-dash">📊 Dashboard</button>
-                    <button class="menu-item" id="nav-orders">🔔 Pedidos Web</button>
+                    
+                    <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
+                        ${lockOrders}🔔 Pedidos Web
+                    </button>
+                    
                     <button class="menu-item" id="nav-inventory">📦 Inventario</button>
                     <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                    <button class="menu-item" id="nav-history">📅 Historial</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers}🚚 Proveedores</button>
+                    <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
+                        ${lockHistory}📅 Historial
+                    </button>
+                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
+                    ${lockBilling}💎 Facturación
+                    </button>
                     <button class="menu-item active">⚙️ Configuración</button>
                     <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
                 </nav>
@@ -30,7 +49,7 @@ export function renderAdminSettings() {
 
                 <div class="card-panel" style="max-width: 600px;">
                     <div style="text-align:center; margin-bottom:20px;">
-                        <img id="preview-img" src="${s.logo_url || 'https://via.placeholder.com/100?text=Logo'}" style="height:100px; object-fit:contain; border-radius:10px; border:1px dashed #ccc;">
+                        <img id="preview-img" src="${logoUrl || 'https://via.placeholder.com/100?text=Logo'}" style="height:100px; object-fit:contain; border-radius:10px; border:1px dashed #ccc;">
                         <br>
                         <label class="btn-primary" style="display:inline-flex; margin-top:10px; cursor:pointer; width:auto;">
                             📷 Cambiar Logo <input type="file" id="logo-upload" hidden accept="image/*">
@@ -38,7 +57,7 @@ export function renderAdminSettings() {
                     </div>
 
                     <label>Nombre del Negocio</label>
-                    <input type="text" id="set-name" class="form-input" value="${s.store_name}" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary);">
+                    <input type="text" id="set-name" class="form-input" value="${name}" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary);">
                     
                     <div style="display:flex; gap:10px;">
                         <div style="flex:1">
@@ -64,43 +83,180 @@ export function renderAdminSettings() {
 }
 
 export function setupSettingsLogic(router) {
+    // 1. Configuración de navegación básica
     const navTo = (p) => router.navigate(p);
-    document.getElementById('nav-dash').addEventListener('click', () => navTo('/admin'));
-    document.getElementById('nav-orders').addEventListener('click', () => navTo('/admin/orders'));
-    document.getElementById('nav-inventory').addEventListener('click', () => navTo('/admin/inventory'));
-    document.getElementById('nav-pos').addEventListener('click', () => navTo('/pos'));
-    document.getElementById('nav-history').addEventListener('click', () => navTo('/admin/history'));
-    document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
+    const bindNav = (id, path) => {
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('click', () => navTo(path));
+    };
+    const btnSup = document.getElementById('nav-suppliers'); if (btnSup) btnSup.addEventListener('click', () => navigateTo('/admin/suppliers'));
+    // Vinculamos botones si existen en el DOM
+    bindNav('nav-dash', '/admin');
+    bindNav('nav-orders', '/admin/orders');
+    bindNav('nav-inventory', '/admin/inventory');
+    bindNav('nav-pos', '/pos');
+    bindNav('nav-history', '/admin/history');
+    bindNav('nav-settings', '/admin/settings');
+    bindNav('nav-suppliers', '/admin/suppliers');
+    bindNav('nav-billing', '/admin/billing');
+    const logoutBtn = document.getElementById('nav-logout');
+    if(logoutBtn) logoutBtn.addEventListener('click', async () => { 
+        await supabase.auth.signOut(); 
+        router.navigate('/'); 
+    });
 
-    const btnTheme = document.getElementById('btn-toggle-theme');
+    // 2. Referencias del Formulario
     const btnSave = document.getElementById('btn-save-settings');
     const nameIn = document.getElementById('set-name');
     const addrIn = document.getElementById('set-address');
     const phoneIn = document.getElementById('set-phone');
     const fileIn = document.getElementById('logo-upload');
     const preview = document.getElementById('preview-img');
-    let file = null;
+    
+    let file = null; // Variable para guardar el archivo seleccionado
 
-    btnTheme.addEventListener('click', () => ThemeService.toggle());
+    // Previsualización de imagen
+    if(fileIn) {
+        fileIn.addEventListener('change', (e) => {
+            if(e.target.files[0]) {
+                file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (ev) => { if(preview) preview.src = ev.target.result; };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
 
-    fileIn.addEventListener('change', (e) => {
-        if(e.target.files[0]) {
-            file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (ev) => preview.src = ev.target.result;
-            reader.readAsDataURL(file);
-        }
-    });
-
-    btnSave.addEventListener('click', async () => {
-        btnSave.disabled = true; btnSave.textContent = "Guardando...";
-        const success = await SettingsService.update({
-            store_name: nameIn.value,
-            address: addrIn.value,
-            phone: phoneIn.value
-        }, file);
+    // --- FUNCIÓN HELPER: Obtener ID de forma segura ---
+    const getMyBusinessId = async (userId) => {
+        // Intento 1: Tabla 'users'
+        let { data, error } = await supabase.from('users').select('business_id').eq('id', userId).single();
         
-        btnSave.disabled = false; btnSave.textContent = "💾 Guardar Cambios";
-        if(success) alert("¡Configuración guardada!");
-    });
+        // Intento 2: Si falla o no hay datos, probamos tabla 'profiles'
+        if (error || !data) {
+            console.warn("No encontrado en 'users', probando 'profiles'...");
+            const res2 = await supabase.from('profiles').select('business_id').eq('id', userId).single();
+            data = res2.data;
+            error = res2.error;
+        }
+
+        if (error || !data) throw new Error("No se pudo encontrar el ID del negocio en 'users' ni en 'profiles'.");
+        return data.business_id;
+    };
+
+    // --- FUNCIÓN: CARGAR DATOS REALES AL ABRIR ---
+    const loadRealData = async () => {
+        try {
+            console.log("🔄 Cargando configuración...");
+            const { data: { user } } = await supabase.auth.getUser();
+            if(!user) return;
+
+            const businessId = await getMyBusinessId(user.id);
+            if(!businessId) return;
+
+            const { data: business } = await supabase
+                .from('businesses')
+                .select('*')
+                .eq('id', businessId)
+                .single();
+
+            if (business) {
+                console.log("✅ Datos cargados:", business);
+                // Rellenar inputs
+                if(nameIn) nameIn.value = business.name || '';
+                if(addrIn) addrIn.value = business.address || '';
+                if(phoneIn) phoneIn.value = business.phone || '';
+                if(preview && business.logo_url) preview.src = business.logo_url;
+
+                // Actualizar Sidebar inmediatamente
+                const sbName = document.getElementById('sb-real-name');
+                const sbLogo = document.getElementById('sb-real-logo');
+                if(sbName) sbName.textContent = business.name;
+                if(sbLogo && business.logo_url) sbLogo.src = business.logo_url;
+
+                // Actualizar Memoria
+                const s = SettingsService.get() || {};
+                s.name = business.name;
+                s.logo_url = business.logo_url;
+                // No hay set, modificamos el objeto directamente si es referencia, 
+                // o idealmente SettingsService debería tener un método .set(data)
+            }
+        } catch (e) {
+            console.error("Error loadRealData:", e.message);
+        }
+    };
+    
+    // Ejecutar carga inicial
+    loadRealData();
+
+    // 3. Botón Guardar
+    if(btnSave) {
+        btnSave.addEventListener('click', async () => {
+            btnSave.disabled = true; 
+            btnSave.textContent = "⏳ Guardando...";
+
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error("Sesión expirada.");
+
+                // Usamos el helper seguro
+                const businessId = await getMyBusinessId(user.id);
+
+                const updates = {
+                    name: nameIn ? nameIn.value : 'Sin Nombre',
+                    address: addrIn ? addrIn.value : '',
+                    phone: phoneIn ? phoneIn.value : ''
+                };
+
+                // Lógica de Subida de Imagen
+                if (file) {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${businessId}/logo-${Date.now()}.${fileExt}`;
+                    
+                    // Subir
+                    const { error: uploadError } = await supabase.storage
+                        .from('logos') 
+                        .upload(fileName, file, { upsert: true });
+
+                    if (uploadError) throw new Error("Error Storage: " + uploadError.message);
+
+                    // Obtener URL
+                    const { data: urlData } = supabase.storage
+                        .from('logos')
+                        .getPublicUrl(fileName);
+                    
+                    updates.logo_url = urlData.publicUrl;
+                }
+
+                // Update en DB
+                const { error: dbError } = await supabase
+                    .from('businesses')
+                    .update(updates)
+                    .eq('id', businessId);
+
+                if (dbError) throw dbError;
+
+                // ÉXITO: Actualizar Interfaz
+                const sbName = document.getElementById('sb-real-name');
+                const sbLogo = document.getElementById('sb-real-logo');
+                
+                if(sbName) sbName.textContent = updates.name;
+                if(sbLogo && updates.logo_url) sbLogo.src = updates.logo_url;
+                
+                // Actualizar Memoria Local (Importante para navegación)
+                const currentSettings = SettingsService.get() || {};
+                currentSettings.name = updates.name;
+                if(updates.logo_url) currentSettings.logo_url = updates.logo_url;
+
+                alert("¡Guardado correctamente!");
+
+            } catch (err) {
+                console.error(err);
+                alert("Error: " + err.message);
+            } finally {
+                btnSave.disabled = false; 
+                btnSave.textContent = "💾 Guardar Cambios";
+            }
+        });
+    }
 }

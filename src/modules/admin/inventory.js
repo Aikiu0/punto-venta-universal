@@ -1,41 +1,60 @@
-// src/modules/admin/inventory.js - CON IMPORTAR (PRO) Y EXPORTAR (EMPRESARIAL)
+// src/modules/admin/inventory.js - UNIFICADO: ESTILO MODERNO + LÓGICA DE BLOQUEO
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
 import { db } from '../../data/db-local.js';
 import { syncService } from '../../services/sync.js';
-import { PermissionService } from '../../services/permissions.js'; // <--- NUEVO
-
+import { PermissionService } from '../../services/permissions.js';
+import { renderSidebarHeader } from './components/sidebarHeader.js';
 let allProducts = [];
 
 export function renderAdminInventory() {
-    // --- CONTROL DE PERMISOS ---
-    // Importar -> Profesional en adelante
-    const showImport = PermissionService.can('import_excel') ? '' : 'display:none;';
-    // Exportar -> Solo Empresarial
-    const showExport = PermissionService.can('export_excel') ? '' : 'display:none;';
+    // --- CONTROL DE PERMISOS (LÓGICA DEL ARCHIVO 1) ---
+    // En lugar de ocultar con display:none, definimos el icono de candado y opacidad
+    // para que el usuario vea la opción pero sepa que es Premium.
     
-    // Botones del menú (ocultar si el plan no lo incluye)
-    const showWebOrders = PermissionService.can('web_orders') ? '' : 'display:none;';
-    const showHistory = PermissionService.can('history') ? '' : 'display:none;';
-    const showSettings = PermissionService.can('settings') ? '' : 'display:none;';
+    const lockHistory = PermissionService.can('history') ? '' : '🔒 ';
+    const lockOrders = PermissionService.can('web_orders') ? '' : '🔒 ';
+    const lockSettings = PermissionService.can('settings') ? '' : '🔒 ';
+    const lockSuppliers = PermissionService.can('suppliers') ? '' : '🔒 ';
+    const lockBilling = PermissionService.can('billing') ? '' : '🔒 ';
+    const canImport = PermissionService.can('import_excel');
+    const lockImport = canImport ? '' : '🔒';
+    const opacityImport = canImport ? '1' : '0.6';
+
+    const canExport = PermissionService.can('export_excel');
+    const lockExport = canExport ? '' : '🔒';
+    const opacityExport = canExport ? '1' : '0.6';
 
     return `
         <div class="admin-container">
             <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
             <aside class="admin-sidebar" id="admin-sidebar">
-                <div class="sidebar-logo" style="display:flex; flex-direction:column; align-items:center; gap:5px;">
-                    <button id="btn-close-sidebar" style="align-self:flex-end; background:none; border:none; color:var(--text-secondary); font-size:1.5rem; display:none;">&times;</button>
-                    <img src="" class="app-logo-img" style="width:80px; height:auto; object-fit:contain; display:none;">
-                    <span class="app-name" style="font-size:1.2rem;">Inventario</span>
+                <div class="sidebar-logo">
+                    ${renderSidebarHeader()}
                 </div>
                 <nav class="sidebar-menu">
                     <button class="menu-item" id="nav-dash">📊 Dashboard</button>
-                    <button class="menu-item" id="nav-orders" style="${showWebOrders}">🔔 Pedidos Web</button>
+                    
+                    <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
+                        ${lockOrders}🔔 Pedidos Web
+                    </button>
+                    
                     <button class="menu-item active">📦 Inventario</button>
-                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja </button>
-                    <button class="menu-item" id="nav-history" style="${showHistory}">📅 Historial</button>
-                    <button class="menu-item" id="nav-settings" style="${showSettings}">⚙️ Configuración</button>
+                    
+                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
+                     <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers}🚚 Proveedores</button>
+                    
+                    <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
+                        ${lockHistory}📅 Historial
+                    </button>
+                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
+                    ${lockBilling}💎 Facturación
+                    </button>
+                    <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event, 'settings')">
+                        ${lockSettings}⚙️ Configuración
+                    </button>
+                    
                     <button class="menu-item logout" id="nav-logout" style="margin-top:auto; color:var(--danger-color);">🚪 Salir</button>
                 </nav>
             </aside>
@@ -55,18 +74,20 @@ export function renderAdminInventory() {
                             🌗
                         </button>
                         
-                        <div style="${showImport}">
-                            <input type="file" id="csv-input" accept=".csv" style="display:none;">
-                            <button id="btn-import-csv" class="btn-secondary" style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:5px;">
-                                📥 Importar
-                            </button>
-                        </div>
-
-                        <button id="btn-export-csv" class="btn-secondary" style="background:#6366f1; color:white; border:none; padding:10px 15px; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:5px; ${showExport}">
-                            📤 Exportar
+                        <input type="file" id="csv-input" accept=".csv" style="display:none;">
+                        <button id="btn-import-csv" class="btn-secondary" 
+                            style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:5px; opacity: ${opacityImport};"
+                            onclick="if(window.checkPlan(event, 'import_excel')) document.getElementById('csv-input').click();">
+                            ${lockImport} 📥 Importar
                         </button>
 
-                        <button id="btn-add-product" class="btn-primary">
+                        <button id="btn-export-csv" class="btn-secondary" 
+                            style="background:#6366f1; color:white; border:none; padding:10px 15px; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:5px; opacity: ${opacityExport};"
+                            onclick="return window.checkPlan(event, 'export_excel')">
+                            ${lockExport} 📤 Exportar
+                        </button>
+
+                        <button id="btn-add-product" class="btn-primary" style="padding:10px 15px; border-radius:8px;">
                             <span>+</span> Nuevo
                         </button>
                     </div>
@@ -152,6 +173,8 @@ export async function setupInventoryLogic(router) {
     const overlay = document.getElementById('sidebar-overlay');
     const btnOpen = document.getElementById('mobile-menu-btn');
     const btnClose = document.getElementById('btn-close-sidebar');
+    
+    // Si estamos en móvil, mostrar botón de cerrar
     if(window.innerWidth <= 768 && btnClose) btnClose.style.display = 'block';
     
     function toggleMenu(show) {
@@ -165,10 +188,22 @@ export async function setupInventoryLogic(router) {
     const navigateTo = (path) => { toggleMenu(false); router.navigate(path); };
     
     document.getElementById('nav-dash').addEventListener('click', () => navigateTo('/admin'));
-    const btnOrders = document.getElementById('nav-orders'); if(btnOrders) btnOrders.addEventListener('click', () => navigateTo('/admin/orders'));
+    
+    // Botones de navegación (los bloqueados ya tienen el onclick inline)
+    const btnOrders = document.getElementById('nav-orders'); 
+    if(btnOrders && !PermissionService.can('web_orders')) { /* Lógica inline maneja el bloqueo */ }
+    else if (btnOrders) { btnOrders.addEventListener('click', () => navigateTo('/admin/orders')); }
+
     const btnPos = document.getElementById('nav-pos'); if(btnPos) btnPos.addEventListener('click', () => navigateTo('/pos'));
-    const btnHist = document.getElementById('nav-history'); if(btnHist) btnHist.addEventListener('click', () => navigateTo('/admin/history'));
-    const btnSet = document.getElementById('nav-settings'); if(btnSet) btnSet.addEventListener('click', () => navigateTo('/admin/settings'));
+    
+    const btnHist = document.getElementById('nav-history'); 
+    if(btnHist && !PermissionService.can('history')) { /* Lógica inline */ }
+    else if(btnHist) { btnHist.addEventListener('click', () => navigateTo('/admin/history')); }
+    const btnSup = document.getElementById('nav-suppliers'); 
+    if (btnSup) btnSup.addEventListener('click', () => navigateTo('/admin/suppliers'));
+    const btnSet = document.getElementById('nav-settings'); 
+    if(btnSet && !PermissionService.can('settings')) { /* Lógica inline */ }
+    else if(btnSet) { btnSet.addEventListener('click', () => navigateTo('/admin/settings')); }
     
     document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); navigateTo('/'); });
     document.getElementById('theme-toggle-inv').addEventListener('click', () => ThemeService.toggle());
@@ -177,6 +212,7 @@ export async function setupInventoryLogic(router) {
     const tableBody = document.getElementById('inventory-table-body');
     const modal = document.getElementById('product-modal');
     const searchInput = document.getElementById('inventory-search');
+    // Inputs del modal
     const pId = document.getElementById('prod-id');
     const pName = document.getElementById('prod-name');
     const pSku = document.getElementById('prod-sku');
@@ -187,13 +223,10 @@ export async function setupInventoryLogic(router) {
     const pUnit = document.getElementById('prod-unit');
     const pBulk = document.getElementById('prod-bulk');
 
-    // --- LÓGICA IMPORTAR CSV (PROFESIONAL +) ---
-    const btnImport = document.getElementById('btn-import-csv');
+    // --- LÓGICA IMPORTAR CSV ---
     const inputCsv = document.getElementById('csv-input');
-
-    if (btnImport && inputCsv) {
-        btnImport.addEventListener('click', () => inputCsv.click());
-        
+    // Nota: El click del input file se dispara desde el HTML si window.checkPlan devuelve true
+    if (inputCsv) {
         inputCsv.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -212,10 +245,10 @@ export async function setupInventoryLogic(router) {
                     if (!row) continue;
                     const cols = row.split(',');
                     if (cols.length < 3) continue; 
-                    // Ignorar cabecera
+                    // Ignorar cabecera si existe
                     if (cols[0].toLowerCase().includes('nombre') && i === 0) continue;
 
-                    // Mapear columnas (Asumimos orden: Nombre, SKU, Precio, Costo, Stock, Categoria)
+                    // Mapear columnas (Orden esperado: Nombre, SKU, Precio, Costo, Stock, Categoria)
                     const name = cols[0].trim();
                     const sku = cols[1].trim();
                     const price = parseFloat(cols[2]) || 0;
@@ -226,7 +259,7 @@ export async function setupInventoryLogic(router) {
                     if (name && price >= 0) {
                         productsToInsert.push({
                             name, sku, price, cost_price: cost, stock, category,
-                            business_id: businessId // <--- IMPORTANTE
+                            business_id: businessId
                         });
                         importedCount++;
                     }
@@ -250,10 +283,14 @@ export async function setupInventoryLogic(router) {
         });
     }
 
-    // --- LÓGICA EXPORTAR CSV (EMPRESARIAL) ---
+    // --- LÓGICA EXPORTAR CSV ---
     const btnExport = document.getElementById('btn-export-csv');
+    // El bloqueo ya está en el onclick del HTML, aquí solo añadimos la lógica funcional
     if(btnExport) {
         btnExport.addEventListener('click', () => {
+            // Verificación extra por seguridad (aunque checkPlan lo filtra visualmente)
+            if(!PermissionService.can('export_excel')) return; 
+
             if(allProducts.length === 0) return alert("No hay productos para exportar.");
             
             let csvContent = "data:text/csv;charset=utf-8,";
@@ -323,6 +360,7 @@ export async function setupInventoryLogic(router) {
         renderTable(allProducts.filter(p => p.name.toLowerCase().includes(t) || (p.sku && p.sku.toLowerCase().includes(t))));
     });
 
+    // --- LÓGICA CATEGORÍAS ---
     async function loadCategories() {
         const { data } = await supabase.from('categories').select('*').eq('business_id', businessId).order('name');
         if (data) {
@@ -341,6 +379,7 @@ export async function setupInventoryLogic(router) {
         }
     });
 
+    // --- LÓGICA MODAL (CRUD) ---
     function openEdit(id) {
         const p = allProducts.find(x => x.id == id);
         if(p) {
@@ -381,8 +420,34 @@ export async function setupInventoryLogic(router) {
     });
 
     async function deleteProduct(id) {
-        if(confirm("¿Borrar?")) { await supabase.from('products').delete().eq('id', id); 
-            if(navigator.onLine) await syncService.downloadProducts();
+        if(!confirm("¿Borrar producto?")) return;
+
+        try {
+            // 1. ACTUALIZACIÓN VISUAL INSTANTÁNEA (Optimistic UI)
+            // Eliminamos el producto del array en memoria inmediatamente
+            allProducts = allProducts.filter(p => p.id != id);
+            // Redibujamos la tabla sin esperar al servidor
+            renderTable(allProducts);
+
+            // 2. ELIMINAR DE SUPABASE
+            const { error } = await supabase.from('products').delete().eq('id', id);
+            
+            if (error) throw error;
+
+            // 3. ELIMINAR DE BD LOCAL (Para consistencia si se recarga la página)
+            // Convertimos a número por seguridad, ya que del HTML viene como string
+            const idParsed = isNaN(Number(id)) ? id : Number(id);
+            await db.products.delete(idParsed);
+
+            // 4. SINCRONIZACIÓN SILENCIOSA (Opcional, para asegurar todo)
+            if(navigator.onLine) {
+                 await syncService.downloadProducts();
+            }
+
+        } catch (error) {
+            console.error("Error al eliminar:", error);
+            alert("Hubo un error al eliminar. Se recargarán los datos.");
+            // Si falló, volvemos a cargar todo para que el producto reaparezca
             loadProducts(); 
         }
     }

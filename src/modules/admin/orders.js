@@ -1,21 +1,24 @@
 // src/modules/admin/orders.js - MODO OSCURO & DISEÑO SUTIL
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
-
+import { renderSidebarHeader } from './components/sidebarHeader.js';
 export function renderAdminOrders() {
     return `
         <div class="admin-container">
             <aside class="admin-sidebar">
-                <div class="sidebar-logo" style="display:flex; flex-direction:column; align-items:center; gap:5px;">
-                    <img src="" class="app-logo-img" style="width:80px; height:auto; object-fit:contain; display:none;">
-                    <span class="app-name" style="font-size:1.2rem;">Cargando...</span>
+                <div class="sidebar-logo">
+                ${renderSidebarHeader()}
                 </div>
                 <nav class="sidebar-menu">
                     <button class="menu-item" id="nav-dash">📊 Dashboard</button>
                     <button class="menu-item active">🔔 Pedidos Web</button>
                     <button class="menu-item" id="nav-inventory">📦 Inventario</button>
                     <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">🚚 Proveedores</button>
                     <button class="menu-item" id="nav-history">📅 Historial</button>
+                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
+                    💎 Facturación
+                    </button>
                     <button class="menu-item" id="nav-settings">⚙️ Configuración</button>
                     <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
                 </nav>
@@ -51,6 +54,10 @@ export async function setupOrdersLogic(router) {
     document.getElementById('nav-pos').addEventListener('click', () => router.navigate('/pos'));
     document.getElementById('nav-settings').addEventListener('click', () => router.navigate('/admin/settings'))
     document.getElementById('nav-history').addEventListener('click', () => router.navigate('/admin/history'));
+    const btnBill = document.getElementById('nav-billing');
+if (btnBill) btnBill.addEventListener('click', () => navigateTo('/admin/billing'));
+    const btnSup = document.getElementById('nav-suppliers'); 
+    if (btnSup) btnSup.addEventListener('click', () => navigateTo('/admin/suppliers'));
     document.getElementById('nav-logout').addEventListener('click', async () => { 
         supabase.removeAllChannels();
         await supabase.auth.signOut(); 

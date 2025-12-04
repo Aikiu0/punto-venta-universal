@@ -1,134 +1,522 @@
-// src/modules/admin/history.js - OPTIMIZADO
+// src/modules/admin/history.js
 import { db } from '../../data/db-local.js';
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
 import { SettingsService } from '../../services/settings.js';
+import { PermissionService } from '../../services/permissions.js';
+import { renderSidebarHeader } from './components/sidebarHeader.js';
+
+// --- ESTILOS CSS (Optimizado para evitar duplicados) ---
+const styles = `
+<style id="history-styles">
+    /* Transiciones globales para UI suave */
+    .history-card, .history-header, .stat-box span, .detail-table th, .detail-table td, .product-list-item {
+        transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* Tarjeta del Mes */
+    .history-card {
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 15px;
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+    }
+    .history-card:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    /* Encabezado Clickable */
+    .history-header {
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        background: var(--bg-card);
+        position: relative;
+        z-index: 2;
+    }
+    .history-header:hover {
+        background: var(--bg-input);
+    }
+
+    /* Estadísticas */
+    .history-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        text-align: right;
+    }
+    .stat-box small { 
+        display: block; 
+        color: var(--text-secondary); 
+        font-size: 0.75rem; 
+        text-transform:uppercase; 
+        font-weight:700; 
+    }
+    .stat-box span { 
+        font-weight: 700; 
+        color: var(--text-primary); 
+        font-size: 1.1rem; 
+    }
+    
+    /* Acordeón Fluido */
+    .history-details {
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transition: max-height 0.5s ease-in-out, opacity 0.4s ease-in-out, background-color 0.3s ease;
+        background: var(--bg-body);
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .history-details.open {
+        max-height: 2000px;
+        opacity: 1;
+    }
+
+    /* Tabla de Detalles */
+    .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+    .detail-table th { 
+        padding: 12px 20px; 
+        text-align: left; 
+        color: var(--text-secondary); 
+        border-bottom: 1px solid var(--border-color); 
+        background: var(--bg-input); 
+    }
+    .detail-table td { 
+        padding: 12px 20px; 
+        border-bottom: 1px solid var(--border-color); 
+        color: var(--text-primary); 
+        vertical-align: top;
+    }
+    .detail-table tr:hover td {
+        background: var(--bg-input);
+    }
+    
+    /* Lista de productos detallada */
+    .product-list-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85em;
+        margin-bottom: 4px;
+        border-bottom: 1px dashed var(--border-color);
+        padding-bottom: 4px;
+    }
+    .product-list-item:last-child { border-bottom: none; margin-bottom: 0; }
+    
+    .item-price-info {
+        color: var(--text-secondary);
+        font-size: 0.9em;
+    }
+    .item-total-info {
+        color: var(--text-primary);
+        font-weight: 600;
+        margin-left: 8px;
+    }
+
+    /* Badges */
+    .badge-type { padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; }
+    .badge-local { background: rgba(37, 99, 235, 0.1); color: #3b82f6; border: 1px solid rgba(37, 99, 235, 0.2); }
+    .badge-web { background: rgba(219, 39, 119, 0.1); color: #ec4899; border: 1px solid rgba(219, 39, 119, 0.2); }
+
+    /* Ajustes móviles */
+    @media (max-width: 768px) {
+        .history-stats { grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+        .history-header { flex-direction: column; align-items: flex-start; gap: 15px; }
+        .stat-box { text-align: left; }
+    }
+</style>
+`;
 
 export function renderHistory() {
     const s = SettingsService.get();
+
+    // --- CONTENIDO CENTRAL ---
+    const contentHTML = `
+        <header class="content-header">
+            <div>
+                <h1>Historial de Ventas</h1>
+                <p style="color:var(--text-secondary)">Reporte detallado de movimientos</p>
+            </div>
+            <div class="header-actions">
+                 <button id="btn-toggle-theme" class="btn-icon" title="Cambiar Tema" style="background:var(--bg-card); border:1px solid var(--border-color); cursor:pointer; padding:8px; border-radius:8px; font-size:1.2rem; transition: all 0.3s ease;">🌓</button>
+            </div>
+        </header>
+
+        <div class="card-panel" style="background:transparent; padding:0; box-shadow:none; border:none;">
+            <div id="history-loading" style="text-align:center; padding:50px; font-size:1.2rem; color:var(--text-secondary);">
+                ⏳ Cargando historial...
+            </div>
+            <div id="history-container"></div>
+        </div>
+    `;
+
+    // --- LÓGICA ANTI-SALTO (Renderizado Condicional) ---
+    const existingContainer = document.querySelector('.admin-container');
+
+    if (existingContainer) {
+        // 1. Inyectamos solo el contenido central
+        const mainContent = existingContainer.querySelector('.admin-content');
+        if (mainContent) mainContent.innerHTML = contentHTML;
+
+        // 2. Actualizamos la clase 'active' del menú
+        existingContainer.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+        // Intentamos buscar por ID, si falla (porque dashboard.js no puso IDs), buscamos por texto
+        let navBtn = existingContainer.querySelector('#nav-history');
+        if (!navBtn) {
+            // Fallback: buscar por texto si venimos de Dashboard
+            const buttons = existingContainer.querySelectorAll('.menu-item');
+            navBtn = Array.from(buttons).find(b => b.textContent.includes('Historial'));
+        }
+        if (navBtn) navBtn.classList.add('active');
+
+        // 3. Estilos
+        if (!document.getElementById('history-styles')) {
+            document.head.insertAdjacentHTML('beforeend', styles);
+        }
+
+        return existingContainer.parentNode.innerHTML;
+    }
+
+    // --- RENDERIZADO COMPLETO (Si se entra directo) ---
+    const canOrders = (PermissionService && PermissionService.can) ? PermissionService.can('web_orders') : true;
+    const lockOrders = canOrders ? '' : '🔒 ';
+    const lockSuppliers = PermissionService.can('suppliers') ? '' : '🔒 ';
+    const lockBilling = PermissionService.can('billing') ? '' : '🔒 ';
+
     return `
+        ${styles}
         <div class="admin-container">
             <aside class="admin-sidebar">
-                <div class="sidebar-logo" style="display:flex; flex-direction:column; align-items:center; gap:5px;">
-                    <img src="${s.logo_url}" class="app-logo-img" style="width:40px; height:40px; object-fit:contain; display:${s.logo_url?'block':'none'}">
-                    <span class="app-name">${s.store_name}</span>
-                </div>
-                <nav class="sidebar-menu">
+                ${renderSidebarHeader()} 
+                <nav class="sidebar-menu" id="sidebar-menu-nav">
                     <button class="menu-item" id="nav-dash">📊 Dashboard</button>
-                    <button class="menu-item" id="nav-orders">🔔 Pedidos Web</button>
+                    <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
+                        ${lockOrders}🔔 Pedidos Web
+                    </button>
                     <button class="menu-item" id="nav-inventory">📦 Inventario</button>
                     <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                    <button class="menu-item active">📅 Historial</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers}🚚 Proveedores</button>
+                    <button class="menu-item active" id="nav-history">📅 Historial</button>
+                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
+                    ${lockBilling}💎 Facturación
+                    </button>
                     <button class="menu-item" id="nav-settings">⚙️ Configuración</button>
+                    <div style="flex:1"></div>
                     <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
                 </nav>
             </aside>
 
             <main class="admin-content">
-                <header class="content-header">
-                    <div class="page-title">
-                        <h1>Historial de Ventas</h1>
-                        <p>Reporte de ingresos y utilidades.</p>
-                    </div>
-                    <button id="theme-toggle-hist" class="icon-btn" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); width:40px; height:40px; border-radius:8px; cursor:pointer;">🌗</button>
-                </header>
-
-                <div class="card-panel">
-                    <div style="overflow-x:auto;">
-                        <table class="modern-table">
-                            <thead>
-                                <tr>
-                                    <th>Mes / Año</th>
-                                    <th>Transacciones</th>
-                                    <th>Venta Total</th>
-                                    <th>Costo Aprox.</th>
-                                    <th>Utilidad</th>
-                                </tr>
-                            </thead>
-                            <tbody id="history-body">
-                                <tr><td colspan="5" style="text-align:center; padding:30px;">⏳ Cargando datos...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                ${contentHTML}
             </main>
         </div>
     `;
 }
 
-export async function setupHistoryLogic(router) {
+export function setupHistoryLogic(router) {
     const navTo = (p) => router.navigate(p);
-    document.getElementById('nav-dash').addEventListener('click', () => navTo('/admin'));
-    document.getElementById('nav-orders').addEventListener('click', () => navTo('/admin/orders'));
-    document.getElementById('nav-inventory').addEventListener('click', () => navTo('/admin/inventory'));
-    document.getElementById('nav-pos').addEventListener('click', () => navTo('/pos'));
-    document.getElementById('nav-settings').addEventListener('click', () => navTo('/admin/settings'));
-    document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
-    document.getElementById('theme-toggle-hist').addEventListener('click', () => ThemeService.toggle());
-
-    // --- OPTIMIZACIÓN: CÁLCULO DIFERIDO ---
-    // Usamos setTimeout para liberar la interfaz gráfica primero
-    setTimeout(() => {
-        generateReport();
-    }, 100);
-
-    async function generateReport() {
-        try {
-            const sales = await db.sales.toArray();
-            const products = await db.products.toArray();
-            
-            const costMap = {};
-            products.forEach(p => costMap[p.name] = Number(p.cost_price || 0));
-
-            const report = {};
-
-            sales.forEach(sale => {
-                const date = new Date(sale.date || sale.created_at);
-                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                const monthName = date.toLocaleString('es-MX', { month: 'long', year: 'numeric' });
-
-                if (!report[key]) report[key] = { name: monthName, count: 0, total: 0, cost: 0, profit: 0 };
-
-                const saleTotal = Number(sale.total || 0);
-                report[key].count += 1;
-                report[key].total += saleTotal;
-
-                let saleCost = 0;
-                if (sale.items) {
-                    sale.items.forEach(item => {
-                        if (item.type === 'meta') return;
-                        const qty = Number(item.cantidad || item.qty || 0);
-                        const unitCost = (item.cost_price !== undefined) ? Number(item.cost_price) : (costMap[item.name] || 0);
-                        saleCost += (unitCost * qty);
-                    });
-                }
-                report[key].cost += saleCost;
-                report[key].profit += (saleTotal - saleCost);
-            });
-
-            const sortedKeys = Object.keys(report).sort().reverse().slice(0, 12);
-            const tbody = document.getElementById('history-body');
-            tbody.innerHTML = '';
-
-            if (sortedKeys.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px;">No hay ventas registradas.</td></tr>`;
-                return;
+    
+    // 1. Configuración ROBUSTA de Listeners del Menú
+    // Usamos selectores genéricos primero para asegurar que encontramos los elementos
+    // independientemente de si dashboard.js o history.js creó la barra lateral.
+    
+    const sidebarNav = document.getElementById('sidebar-menu-nav') || document.querySelector('.sidebar-menu');
+    
+    if (sidebarNav && sidebarNav.dataset.listenersAttached !== 'true') {
+        
+        // Función auxiliar para buscar botón por ID o por Texto (Fallback)
+        const bindSmart = (id, textMatch, path) => {
+            let el = document.getElementById(id);
+            if (!el && textMatch) {
+                // Si no hay ID, buscamos por el texto dentro del botón
+                const buttons = sidebarNav.querySelectorAll('.menu-item');
+                el = Array.from(buttons).find(b => b.textContent.includes(textMatch));
             }
+            if (el) {
+                // Clonamos el nodo para limpiar listeners viejos si es necesario, o solo agregamos
+                el.onclick = (e) => {
+                    e.preventDefault(); // Prevenir comportamientos raros
+                    navTo(path);
+                };
+            }
+        };
 
-            sortedKeys.forEach(key => {
-                const row = report[key];
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td style="text-transform:capitalize; font-weight:bold;">${row.name}</td>
-                    <td>${row.count}</td>
-                    <td style="color:var(--text-primary); font-weight:bold;">$${row.total.toLocaleString('es-MX', {minimumFractionDigits:2})}</td>
-                    <td style="color:var(--text-secondary);">$${row.cost.toLocaleString('es-MX', {minimumFractionDigits:2})}</td>
-                    <td style="color:var(--success-bg); font-weight:800;">$${row.profit.toLocaleString('es-MX', {minimumFractionDigits:2})}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        } catch (e) {
-            console.error("Error en reporte:", e);
+        // VINCULACIÓN DE RUTAS (CORREGIDO: Dashboard va a '/admin', no '/admin/dashboard')
+        bindSmart('nav-dash', 'Dashboard', '/admin'); 
+        bindSmart('nav-orders', 'Pedidos', '/admin/orders');
+        bindSmart('nav-inventory', 'Inventario', '/admin/inventory');
+        bindSmart('nav-pos', 'Caja', '/pos');
+        bindSmart('nav-settings', 'Configuración', '/admin/settings');
+        bindSmart('nav-suppliers', 'Proveedores', '/admin/suppliers');
+        bindSmart('nav-billing', 'Facturación', '/admin/billing');
+        
+        const logoutBtn = document.getElementById('nav-logout') || sidebarNav.querySelector('.logout');
+        if(logoutBtn) logoutBtn.addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
+
+        sidebarNav.dataset.listenersAttached = 'true';
+    }
+
+    // 2. BOTÓN DE MODO OSCURO
+    const btnTheme = document.getElementById('btn-toggle-theme');
+    if(btnTheme) {
+        btnTheme.addEventListener('click', () => ThemeService.toggle());
+    }
+
+    // 3. Cargar Datos
+    loadHistory();
+}
+
+async function loadHistory() {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if(!user) return;
+
+        let businessId = null;
+        let { data: uData } = await supabase.from('users').select('business_id').eq('id', user.id).single();
+        if(!uData) {
+            const { data: pData } = await supabase.from('profiles').select('business_id').eq('id', user.id).single();
+            uData = pData;
         }
+        if(uData) businessId = uData.business_id;
+
+        // --- CARGA DE DATOS ---
+        const localSales = await db.sales.toArray();
+        const localProducts = await db.products.toArray(); 
+
+        // Mapa de Costos de Respaldo
+        const costMap = new Map();
+        localProducts.forEach(p => {
+            const c = Number(p.cost_price || p.cost || 0);
+            if (!isNaN(c)) {
+                if (p.id) costMap.set(String(p.id), c);
+                if (p.name) costMap.set(`name:${p.name}`, c);
+            }
+        });
+
+        let webOrders = [];
+        if (businessId) {
+            const { data } = await supabase.from('orders').select('*').eq('business_id', businessId).neq('status', 'cancelled');
+            if (data) webOrders = data;
+        }
+
+        // --- LÓGICA DE CONTABILIDAD ---
+        const calculateTotalCost = (items) => {
+            if (!items || !Array.isArray(items)) return 0;
+            return items.reduce((acc, item) => {
+                if (item.type === 'meta') return acc;
+                const cantidad = Number(item.cantidad || item.qty || item.quantity || 1);
+                
+                let costoUnitario = 0;
+                // 1. Costo histórico
+                if (item.historical_cost !== undefined && item.historical_cost !== null) {
+                    costoUnitario = Number(item.historical_cost);
+                } 
+                // 2. Propiedades legacy
+                else if (item.cost || item.costo) {
+                    costoUnitario = Number(item.cost || item.costo);
+                }
+                // 3. Catálogo actual por ID
+                else if (item.id && costMap.has(String(item.id))) {
+                    costoUnitario = costMap.get(String(item.id));
+                }
+                // 4. Buscar por nombre
+                else {
+                    costoUnitario = costMap.get(`name:${item.name}`) || 0;
+                }
+
+                return acc + (cantidad * costoUnitario);
+            }, 0);
+        };
+
+        const allSales = [
+            ...localSales.map(s => {
+                const totalCostoVenta = calculateTotalCost(s.items);
+                return { 
+                    ...s, 
+                    origin: 'local', 
+                    dateObj: new Date(s.date || s.timestamp), 
+                    profitCalc: (s.total || 0) - totalCostoVenta, 
+                    itemsList: s.items || [] 
+                };
+            }),
+            ...webOrders.map(o => {
+                const items = o.items || o.cart || [];
+                const totalCostoVenta = calculateTotalCost(items);
+                
+                return { 
+                    ...o, 
+                    origin: 'web', 
+                    dateObj: new Date(o.created_at), 
+                    profitCalc: (o.total || 0) - totalCostoVenta, 
+                    itemsList: items
+                };
+            })
+        ];
+
+        const report = {};
+        allSales.forEach(sale => {
+            if (!sale.total) return;
+            const key = `${sale.dateObj.getFullYear()}-${sale.dateObj.getMonth()}`;
+            if (!report[key]) {
+                const monthName = sale.dateObj.toLocaleString('es-MX', { month: 'long', year: 'numeric' });
+                report[key] = {
+                    name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+                    count: 0, 
+                    total: 0, 
+                    cost: 0, 
+                    profit: 0, 
+                    transactions: []
+                };
+            }
+            report[key].count += 1;
+            report[key].total += Number(sale.total);
+            report[key].profit += Number(sale.profitCalc || 0);
+            report[key].transactions.push(sale);
+        });
+
+        renderHistoryUI(report);
+
+    } catch (e) {
+        console.error("Error en historial:", e);
+        const loadDiv = document.getElementById('history-loading');
+        if(loadDiv) loadDiv.innerHTML = 'Error al cargar historial (DB Bloqueada). Intenta recargar.';
     }
 }
+
+function renderHistoryUI(report) {
+    const container = document.getElementById('history-container');
+    const loading = document.getElementById('history-loading');
+    if(loading) loading.style.display = 'none';
+    if(!container) return;
+
+    container.innerHTML = '';
+    
+    const sortedKeys = Object.keys(report).sort((a,b) => {
+        const [yA, mA] = a.split('-');
+        const [yB, mB] = b.split('-');
+        return new Date(yB, mB) - new Date(yA, mA);
+    });
+
+    if (sortedKeys.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-secondary);">No hay registros de ventas.</div>`;
+        return;
+    }
+
+    const fmtMoney = (n) => n.toLocaleString('es-MX', { style:'currency', currency:'MXN' });
+
+    sortedKeys.forEach(key => {
+        const data = report[key];
+        data.transactions.sort((a,b) => b.dateObj - a.dateObj);
+
+        const card = document.createElement('div');
+        card.className = 'history-card';
+        card.innerHTML = `
+            <div class="history-header" onclick="toggleDetails('${key}')">
+                <div style="flex:1">
+                    <h3 style="margin:0; font-size:1.2rem; display:flex; align-items:center; gap:10px; color:var(--text-primary);">
+                        ${data.name} 
+                        <span id="arrow-${key}" style="font-size:0.75rem; background:var(--bg-input); padding:4px 10px; border-radius:12px; color:var(--text-secondary); border:1px solid var(--border-color); transition: transform 0.3s ease;">
+                            ▼
+                        </span>
+                    </h3>
+                </div>
+                <div class="history-stats">
+                    <div class="stat-box"><small>Ventas</small><span>${data.count}</span></div>
+                    <div class="stat-box"><small>Ingreso</small><span style="color:#3b82f6;">${fmtMoney(data.total)}</span></div>
+                    <div class="stat-box"><small>Ganancia</small><span style="color:#10b981;">${fmtMoney(data.profit)}</span></div>
+                </div>
+            </div>
+
+            <div id="details-${key}" class="history-details">
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th style="width:15%">Fecha</th>
+                            <th style="width:10%">Origen</th>
+                            <th style="width:55%">Desglose de Productos</th>
+                            <th style="width:20%; text-align:right">Total Venta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.transactions.map(t => {
+                            let itemsHtml = '';
+                            if (t.itemsList && t.itemsList.length > 0) {
+                                itemsHtml = t.itemsList.map(i => {
+                                    if(i.type === 'meta') return '';
+                                    const qty = i.cantidad || i.qty || 1; 
+                                    const price = i.price || 0;
+                                    const subTotal = qty * price;
+                                    
+                                    return `
+                                    <div class="product-list-item">
+                                        <span style="font-weight:500;">
+                                            ${qty}x ${i.name || i.product_name || 'Producto'}
+                                        </span>
+                                        <span>
+                                            <span class="item-price-info">($${price.toFixed(2)})</span>
+                                            <span class="item-total-info">⮕ $${subTotal.toFixed(2)}</span>
+                                        </span>
+                                    </div>
+                                    `;
+                                }).join('');
+                            } else {
+                                itemsHtml = '<span style="color:var(--text-secondary); font-style:italic;">Sin detalles de productos</span>';
+                            }
+
+                            return `
+                            <tr>
+                                <td>
+                                    <div style="font-weight:bold;">${t.dateObj.toLocaleDateString()}</div>
+                                    <div style="font-size:0.8em; color:var(--text-secondary);">${t.dateObj.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+                                </td>
+                                <td>
+                                    <span class="badge-type ${t.origin === 'local' ? 'badge-local' : 'badge-web'}">
+                                        ${t.origin === 'local' ? 'CAJA' : 'WEB'}
+                                    </span>
+                                </td>
+                                <td>
+                                    ${itemsHtml}
+                                    ${t.customer_name ? `<div style="margin-top:4px; font-size:0.8em; color:var(--text-primary); font-weight:bold; border-top:1px dotted var(--border-color); padding-top:2px;">👤 ${t.customer_name}</div>` : ''}
+                                </td>
+                                <td style="text-align:right; font-weight:bold; color:var(--text-primary); font-size:1.1em;">
+                                    ${fmtMoney(t.total)}
+                                </td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+                <div style="text-align:center; padding:15px; font-size:0.8rem; color:var(--text-secondary);">
+                    Fin de registros de ${data.name}
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+// Función global para el toggle fluido
+window.toggleDetails = function(key) {
+    const el = document.getElementById(`details-${key}`);
+    const arrow = document.getElementById(`arrow-${key}`);
+    
+    if (el) {
+        if (el.classList.contains('open')) {
+            el.classList.remove('open');
+            if(arrow) arrow.style.transform = "rotate(0deg)";
+        } else {
+            el.classList.add('open');
+            if(arrow) arrow.style.transform = "rotate(180deg)";
+        }
+    }
+};
