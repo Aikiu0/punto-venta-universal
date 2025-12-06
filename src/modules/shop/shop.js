@@ -124,7 +124,7 @@ export async function setupShopLogic(router) {
         const { data: stores } = await supabase
             .from('businesses')
             .select('id, name, slug, logo_url, primary_color, plan')
-            .eq('plan', 'empresarial')
+            .eq('plan', 'profesional',)
             .limit(50);
         
         function renderStoreCards(list) {
@@ -152,7 +152,7 @@ export async function setupShopLogic(router) {
         try {
             const { data: business, error } = await supabase.from('businesses').select('*').eq('slug', slug).single();
             if (error || !business) return renderError("Tienda no encontrada.");
-            if (business.plan !== 'empresarial') return renderError("Esta tienda no tiene habilitada la venta en línea.");
+            if (business.plan !== 'profesional') return renderError("Esta tienda no tiene habilitada la venta en línea.");
 
             currentBusiness = business;
             root.innerHTML = renderStoreUI(business);
@@ -380,17 +380,16 @@ export async function setupShopLogic(router) {
         const itemsToSave = [...shopCart.map(i => ({ id: i.id, name: i.name, qty: i.qty, unit: i.unit, price: i.price })), { type: 'meta', payment_method: method }];
 
         try {
-            const { error: orderError } = await supabase.from('web_orders').insert({
-                customer_name: name, customer_contact: phone, items: itemsToSave, total: total, status: 'pendiente', business_id: currentBusiness.id
+            const { data: rpcData, error: rpcError } = await supabase.rpc('crear_pedido_web', {
+            p_business_id: currentBusiness.id,
+            p_customer_name: name,
+            p_customer_contact:phone,
+            p_items: shopCart,
+            p_total: total
             });
-            if (orderError) throw orderError;
 
-            for (const item of shopCart) {
-                const { data: product } = await supabase.from('products').select('stock').eq('id', item.id).single();
-                if (product) {
-                    await supabase.from('products').update({ stock: product.stock - item.qty }).eq('id', item.id);
-                }
-            }
+            if (rpcError) throw rpcError;
+            if (!rpcData.success) throw new Error(rpcData.message);
 
             shopCart = []; updateCartUI();
             const cartBody = document.getElementById('cart-body');

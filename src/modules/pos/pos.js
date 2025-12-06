@@ -14,6 +14,7 @@ let isSyncing = false;
 
 // Variable para guardar los datos frescos de la tabla 'businesses'
 let datosNegocio = {
+    
     name: 'Mi Negocio',
     address: '',
     phone: ''
@@ -134,6 +135,28 @@ export async function setupPOSLogic(router) {
     const businessId = localStorage.getItem('archsell_business_id');
     
     if (!businessId) console.warn("⚠️ No se encontró ID de negocio.");
+    async function safeSync() {
+        if (isSyncing || !navigator.onLine) return;
+        isSyncing = true;
+        const btn = document.getElementById('btn-sync');
+        if(btn) btn.innerHTML = "⏳"; // Feedback visual
+
+        try {
+            console.log("🔄 Iniciando sincronización segura...");
+            await syncService.uploadSales();
+            await db.products.clear();
+            await syncService.downloadProducts();
+            productosGlobal = await db.products.toArray();
+            renderGrid(productosGlobal);
+            checkPendingOrders();
+            console.log("✅ Sincronización terminada");
+        } catch (e) {
+            console.error("Sync error:", e);
+        } finally {
+            isSyncing = false;
+            if(btn) btn.innerHTML = "🔄";
+        }
+    }
 
     // --- CARGA Y REALTIME ---
     async function loadInitialData() {
@@ -298,59 +321,61 @@ export async function setupPOSLogic(router) {
     }
 
     async function saveWebSale(order, received, change) {
-        try {
-            const { data: authData } = await supabase.auth.getUser(); 
-            if (!authData || !authData.user) { alert("Sesión expirada"); return; }
-            
-            const itemsNormalizados = order.items.filter(i => i.type !== 'meta').map(i => ({ ...i, cantidad: Number(i.qty || i.cantidad || 1), unit: i.unit || 'pz' }));
-            let method = "Web/Pickup"; const meta = order.items.find(i => i.type === 'meta'); if (meta && meta.payment_method) method = meta.payment_method.toUpperCase();
-            
-            // Generamos UUID también para ventas web
-            const ventaUid = uuidv4();
-            
-            const venta = { 
-                uuid: ventaUid, 
-                date: new Date(), 
-                total: order.total, 
-                items: itemsNormalizados, 
-                payment: { method: method, received: received, change: change } 
-            };
-            
-            const { error: insertError } = await supabase.from('sales').insert({ 
-                id: ventaUid, // IDOMPOTENCIA: Se fuerza el ID aquí, esto ya estaba bien
-                created_at: new Date(), 
-                total: order.total, 
-                items: itemsNormalizados, 
-                payment_data: { method: method, customer: order.customer_name, received: received, change: change }, 
-                user_id: authData.user.id, 
-                business_id: businessId 
-            });
-            
-            if (insertError) throw insertError;
-            
-            await supabase.from('web_orders').update({ status: 'entregado' }).eq('id', order.id);
+        const btnConfirm = document.getElementById('btn-confirm-web');
+    if(btnConfirm) { btnConfirm.disabled = true; btnConfirm.textContent = "Procesando..."; }
 
-            checkPendingOrders(); 
-            mostrarTicket(venta);
-        } catch (error) { console.error(error); alert("Error: " + error.message); }
+    try {
+        const { data: authData } = await supabase.auth.getUser();
+        
+        // Normalizamos items para que SQL los entienda
+        const itemsNormalizados = order.items.filter(i => i.type !== 'meta').map(i => ({ 
+            id: i.id,
+            name: i.name,
+            price: i.price,
+            cantidad: Number(i.qty || i.cantidad || 1), 
+            unit: i.unit || 'pz' 
+        }));
+
+        const ventaUid = uuidv4(); // Generamos ID único
+
+        const paymentData = { 
+            method: "Web/Pickup", 
+            customer: order.customer_name, 
+            received: received, 
+            change: change 
+        };
+
+        // LLAMADA A SQL: Registra la venta y marca entregado, PERO NO TOCA EL STOCK
+        // (El stock ya se restó cuando se creó el pedido en shop.js)
+        const { data: rpcData, error: rpcError } = await supabase.rpc('procesar_pedido_web', {
+            // CORRECCIÓN AQUÍ: Usamos localStorage en vez de db.businesses
+            p_business_id: datosNegocio.id || localStorage.getItem('archsell_business_id'),
+            p_web_order_id: order.id,
+            p_sale_id: ventaUid,
+            p_user_id: authData.user.id,
+            p_total: order.total,
+            p_items: itemsNormalizados,
+            p_payment_data: paymentData
+        });
+
+        if (rpcError) throw rpcError;
+        if (!rpcData.success) throw new Error(rpcData.message);
+
+        // Éxito: Limpiamos UI e imprimimos
+        checkPendingOrders();
+        mostrarTicket({ 
+            uuid: ventaUid, 
+            date: new Date(), 
+            total: order.total, 
+            items: itemsNormalizados, 
+            payment: paymentData 
+        });
+
+    } catch (error) {
+        console.error(error);
+        alert("Error: " + error.message);
+        if(btnConfirm) { btnConfirm.disabled = false; btnConfirm.textContent = "FINALIZAR"; }
     }
-
-    // --- SYNC (FIX: Función segura con semáforo) ---
-    async function safeSync() {
-        if (isSyncing || !navigator.onLine) return;
-        isSyncing = true;
-        try {
-            await syncService.uploadSales();
-            await db.products.clear();
-            await syncService.downloadProducts();
-            productosGlobal = await db.products.toArray();
-            renderGrid(productosGlobal);
-            checkPendingOrders();
-        } catch (e) {
-            console.error("Sync error:", e);
-        } finally {
-            isSyncing = false;
-        }
     }
 
     syncService.listenConnection(async (isOnline) => {

@@ -2,7 +2,8 @@
 const PLANS = {
     'esencial': ['pos', 'inventory', 'dashboard','settings'],
     'profesional': ['pos', 'inventory', 'dashboard', 'history', 'settings', 'import_excel','web_orders', 'suppliers', 'billing', 'export_excel', 'suppliers',  'billing_individual'],
-    'empresarial': ['pos', 'inventory', 'dashboard', 'history', 'settings', 'import_excel', 'web_orders', 'export_excel', 'suppliers', 'billing', 'billing_individual']
+    'empresarial': ['pos', 'inventory', 'dashboard', 'history', 'settings', 'import_excel', 'web_orders', 'export_excel', 'suppliers', 'billing', 'billing_individual'],
+    'petmarc': ['pos', 'inventory', 'dashboard', 'history', 'settings', 'import_excel','web_orders', 'suppliers', 'billing', 'export_excel', 'suppliers',  'billing_individual']
 };
 
 function createUpsellModal() {

@@ -26,7 +26,6 @@ export const syncService = {
     },
 
     async uploadSales() {
-        // Buscar ventas pendientes en Dexie
         const pendingSales = await db.sales.where('sync_status').equals('pending').toArray();
         if (pendingSales.length === 0) return;
 
@@ -37,69 +36,37 @@ export const syncService = {
 
         for (const sale of pendingSales) {
             try {
-                // --- PASO 1: LIMPIEZA DE DATOS (CORREGIDO) ---
-                // Importante: Agregamos 'uuid' a la desestructuración para SACARLO del objeto.
-                // Al ponerlo aquí, se queda en la variable 'uuid' y NO pasa a 'restOfSale'.
-                const { 
-                    id, 
-                    uuid,         // <--- ESTA ES LA CORRECCIÓN CLAVE
-                    sync_status, 
-                    items_rpc, 
-                    payment, 
-                    date, 
-                    ...restOfSale // Aquí queda solo lo que coincide con tu tabla 'sales' real
-                } = sale;
+                // --- SOLUCIÓN BLINDADA USANDO RPC ---
+                // En lugar de insertar y luego actualizar (que causa errores si se corta el internet),
+                // enviamos todo junto a la base de datos.
                 
-                // Construimos el objeto EXACTO que pide Supabase
-                const saleToInsert = {
-                    ...restOfSale,
-                    payment_data: payment, 
-                    created_at: new Date(date).toISOString(),
-                    items: sale.items,
-                    business_id: businessId
-                };
 
-                // Insertamos en la nube
-                const { error: insertError } = await supabase.from('sales').insert(saleToInsert);
+                const { data: rpcData, error: rpcError } = await supabase.rpc('sincronizar_venta_offline', {
+                    p_sale_id: sale.id,          // ¡CRUCIAL! Enviamos el ID original para evitar duplicados
+                    p_business_id: businessId,
+                    p_user_id: sale.user_id || (await supabase.auth.getUser()).data.user?.id, // Fallback por si acaso
+                    p_total: sale.total,
+                    p_items: sale.items,         // Enviamos los items para que SQL reste el stock allá mismo
+                    p_payment_data: sale.payment || sale.payment_data,
+                    p_created_at: new Date(sale.date || sale.created_at).toISOString()
+                });
 
-                if (insertError) {
-                    console.error("Error insertando venta:", insertError);
-                    // Si falla la inserción por duplicado, podrías marcarla como synced opcionalmente
-                    // if (insertError.code === '23505') ...
-                    continue; 
+                if (rpcError) throw rpcError;
+
+                // Si la BD responde éxito (ya sea que la creó o que detectó que ya existía)
+                if (rpcData.success) {
+                    console.log(`✅ Venta sincronizada: ${sale.id} (${rpcData.status})`);
+                    
+                    // Actualizamos localmente a 'synced' para no volver a enviarla
+                    await db.sales.update(sale.id, { sync_status: 'synced' });
+                } else {
+                    console.error(`⚠️ Venta rechazada por lógica de negocio: ${rpcData.message}`);
                 }
-
-                // --- PASO 2: RESTAR STOCK (Lógica existente) ---
-                const itemsToUpdate = items_rpc || sale.items.map(i => ({
-                    id: i.id,
-                    qty: Number(i.cantidad || i.qty || 1)
-                }));
-
-                console.log("📉 Restando stock para:", itemsToUpdate);
-
-                for (const item of itemsToUpdate) {
-                    const { data: productNow } = await supabase
-                        .from('products')
-                        .select('stock')
-                        .eq('id', item.id)
-                        .single();
-
-                    if (productNow) {
-                        const nuevoStock = productNow.stock - item.qty;
-                        
-                        await supabase
-                            .from('products')
-                            .update({ stock: nuevoStock })
-                            .eq('id', item.id);
-                    }
-                }
-
-                // --- PASO 3: ÉXITO ---
-                // Marcamos como sincronizado en local usando el ID original de Dexie
-                await db.sales.update(id, { sync_status: 'synced' });
 
             } catch (err) {
-                console.error("Error fatal en venta:", err);
+                console.error("❌ Error de red o servidor en venta:", sale.id, err);
+                // NO hacemos nada más. Como no actualizamos a 'synced', se reintentará luego.
+                // Gracias a p_sale_id, el reintento NO creará duplicados.
             }
         }
     },
