@@ -31,21 +31,23 @@ styleSheet.innerText = `
 if (!document.getElementById('shine-style-v3')) document.head.appendChild(styleSheet);
 
 export function renderSidebarHeader() {
-    const s = SettingsService.get() || {}; 
+    const s = SettingsService.get() || {};
+    const planName = PermissionService.getCurrentPlanName();
+
     const logo = s.logo_url || 'https://via.placeholder.com/100?text=Logo';
     const name = s.name || 'Cargando...';
-    const planName = PermissionService.getCurrentPlanName(); 
+
+    setTimeout(() => autoUpdateSidebarHeader(), 300);
 
     return `
         <div id="sidebar-header-root" style="
             width: 100%;
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             justify-content: center;
-            text-align: center; 
+            text-align: center;
             padding: 20px 10px 15px 10px;
-            /* Separador inferior más elegante usando sombras en lugar de borde sólido */
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
             background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.2));
             box-sizing: border-box;
@@ -54,53 +56,74 @@ export function renderSidebarHeader() {
             z-index: 1;
         ">
             <div class="premium-glass-container" style="
-                width: 50px; 
-                height: 50px; 
-                border-radius: 14px; /* Bordes un poco más suaves */
-                /* QUITAMOS background: white y padding */
-                padding: 0; 
-                margin-bottom: 10px; 
-                display: flex; 
-                align-items: center; 
+                width: 50px;
+                height: 50px;
+                border-radius: 14px;
+                padding: 0;
+                margin-bottom: 10px;
+                display: flex;
+                align-items: center;
                 justify-content: center;
                 overflow: hidden;
-                position: relative;
             ">
                 <img id="sb-real-logo" src="${logo}" style="
-                    width: 100%; 
-                    height: 100%; 
-                    object-fit: cover; /* Cover para que llene el espacio sin bordes blancos */
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
                     border-radius: 14px;
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2)); /* Sombra interna al logo */
-                " onerror="this.src='https://via.placeholder.com/45?text=Error'">
+                ">
             </div>
 
             <h3 id="sb-real-name" style="
-                color: #e2e8f0; /* Blanco hueso, no blanco puro */
-                margin: 0 0 8px 0; 
-                font-size: 0.9rem; 
-                font-weight: 700; 
+                color: #e2e8f0;
+                margin: 0 0 8px 0;
+                font-size: 0.9rem;
+                font-weight: 700;
                 width: 100%;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
                 letter-spacing: 0.5px;
-                text-shadow: 0 2px 4px rgba(0,0,0,0.5); /* Profundidad */
             ">
                 ${name}
             </h3>
 
-            <span class="plan-badge-premium" style="
-                color: white; 
-                font-size: 0.65rem; 
-                padding: 3px 12px; 
-                border-radius: 6px; 
-                font-weight: 800; 
-                text-transform: uppercase; 
+            <span id="sb-real-plan" class="plan-badge-premium" style="
+                color: white;
+                font-size: 0.65rem;
+                padding: 3px 12px;
+                border-radius: 6px;
+                font-weight: 800;
+                text-transform: uppercase;
                 letter-spacing: 1px;
             ">
                 ${planName}
             </span>
         </div>
     `;
+}
+function autoUpdateSidebarHeader() {
+    const s = SettingsService.get() || {};
+
+    const logo = s.logo_url || 'https://via.placeholder.com/100?text=Logo';
+    const name = s.name || '';
+
+    const logoEl = document.getElementById('sb-real-logo');
+    const nameEl = document.getElementById('sb-real-name');
+    const planEl = document.getElementById('sb-real-plan');
+
+    if (logoEl && logoEl.src !== logo) {
+        logoEl.src = logo;
+    }
+
+    if (nameEl && nameEl.innerText !== name) {
+        nameEl.innerText = name;
+    }
+
+    if (planEl) {
+        const planName = PermissionService.getCurrentPlanName();
+        if (planEl.innerText !== planName) {
+            planEl.innerText = planName;
+        }
+    }
 }

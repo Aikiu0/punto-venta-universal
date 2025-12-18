@@ -1,43 +1,61 @@
 // src/services/pwa.js
 export const PwaService = {
     deferredPrompt: null,
+    updateAvailable: false,
+    waitingWorker: null,
 
     init() {
-        // 1. Registrar el Service Worker
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('SW registrado:', reg.scope))
-                    .catch(err => console.log('SW error:', err));
+            navigator.serviceWorker.register('/sw.js').then(reg => {
+                if (reg.waiting) {
+                    this.setUpdateAvailable(reg.waiting);
+                }
+
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            this.setUpdateAvailable(newWorker);
+                        }
+                    });
+                });
+            });
+
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                window.location.reload();
             });
         }
 
-        // 2. Capturar el evento de instalación
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // Prevenir que Chrome muestre su barra automática fea
+        window.addEventListener('beforeinstallprompt', e => {
             e.preventDefault();
-            // Guardar el evento para usarlo después
             this.deferredPrompt = e;
-            
-            // Mostrar nuestro botón personalizado (si existe en el DOM)
             this.showInstallButton();
         });
     },
 
+    setUpdateAvailable(worker) {
+        this.updateAvailable = true;
+        this.waitingWorker = worker;
+        window.dispatchEvent(new Event('pwa-update-available'));
+    },
+
+    applyUpdate() {
+        if (this.waitingWorker) {
+            this.waitingWorker.postMessage('SKIP_WAITING');
+        }
+    },
+
     showInstallButton() {
         const btn = document.getElementById('btn-install-app');
-        if (btn) {
-            btn.style.display = 'flex'; // Hacerlo visible
-            
-            btn.addEventListener('click', async () => {
-                if (this.deferredPrompt) {
-                    this.deferredPrompt.prompt();
-                    const { outcome } = await this.deferredPrompt.userChoice;
-                    console.log(`Usuario respondió: ${outcome}`);
-                    this.deferredPrompt = null;
-                    btn.style.display = 'none'; // Ocultar botón tras instalar
-                }
-            });
-        }
+        if (!btn) return;
+
+        btn.style.display = 'flex';
+        btn.onclick = async () => {
+            if (!this.deferredPrompt) return;
+            this.deferredPrompt.prompt();
+            await this.deferredPrompt.userChoice;
+            this.deferredPrompt = null;
+            btn.style.display = 'none';
+        };
     }
 };

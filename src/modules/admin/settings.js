@@ -3,6 +3,7 @@ import { ThemeService } from '../../services/theme.js';
 import { SettingsService } from '../../services/settings.js'; 
 import { PermissionService } from '../../services/permissions.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
+import { PwaService } from '../../services/pwa.js';
 export function renderAdminSettings() {
     const s = SettingsService.get();
 
@@ -14,7 +15,7 @@ export function renderAdminSettings() {
     // Usamos s.name y s.logo_url con valores por defecto para evitar errores visuales
     const logoUrl = s.logo_url || '';
     const name = s.name || s.name || 'Mi Negocio';
-
+    const footer = s.ticket_footer || '';
     return `
         <div class="admin-container">
             <aside class="admin-sidebar">
@@ -69,11 +70,16 @@ export function renderAdminSettings() {
                             <input type="text" id="set-phone" class="form-input" value="${s.phone||''}" style="width:100%; padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary);">
                         </div>
                     </div>
-
-                    <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px; display:flex; justify-content:space-between; align-items:center;">
-                        <span style="color:var(--text-primary)">Tema Oscuro</span>
-                        <button id="btn-toggle-theme" style="padding:8px; cursor:pointer;">🌗 Cambiar</button>
-                    </div>
+                    <label>Leyenda del Ticket (Pie de página)</label>
+                    <textarea id="set-footer" class="form-input" rows="3" placeholder="Ej: No devoluciones. Gracias por su compra." style="width:100%; padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); resize:vertical;">${footer}</textarea>
+                    <button
+  id="btn-update-system"
+  class="btn-secondary"
+  style="width:100%; margin-top:15px; opacity:70.5; cursor:not-allowed;"
+  disabled
+>
+  ✅ Sistema actualizado
+</button>
 
                     <button id="btn-save-settings" class="btn-primary" style="width:100%; margin-top:20px; justify-content:center;">💾 Guardar Cambios</button>
                 </div>
@@ -112,7 +118,7 @@ export function setupSettingsLogic(router) {
     const phoneIn = document.getElementById('set-phone');
     const fileIn = document.getElementById('logo-upload');
     const preview = document.getElementById('preview-img');
-    
+    const updateBtn = document.getElementById('btn-update-system');
     let file = null; // Variable para guardar el archivo seleccionado
 
     // Previsualización de imagen
@@ -167,6 +173,7 @@ export function setupSettingsLogic(router) {
                 if(addrIn) addrIn.value = business.address || '';
                 if(phoneIn) phoneIn.value = business.phone || '';
                 if(preview && business.logo_url) preview.src = business.logo_url;
+                if(footerIn) footerIn.value = business.ticket_footer ||'';
 
                 // Actualizar Sidebar inmediatamente
                 const sbName = document.getElementById('sb-real-name');
@@ -194,7 +201,7 @@ export function setupSettingsLogic(router) {
         btnSave.addEventListener('click', async () => {
             btnSave.disabled = true; 
             btnSave.textContent = "⏳ Guardando...";
-
+            const footerIn = document.getElementById('set-footer');
             try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) throw new Error("Sesión expirada.");
@@ -205,7 +212,8 @@ export function setupSettingsLogic(router) {
                 const updates = {
                     name: nameIn ? nameIn.value : 'Sin Nombre',
                     address: addrIn ? addrIn.value : '',
-                    phone: phoneIn ? phoneIn.value : ''
+                    phone: phoneIn ? phoneIn.value : '',
+                    ticket_footer: footerIn ? footerIn.value : ''
                 };
 
                 // Lógica de Subida de Imagen
@@ -259,4 +267,36 @@ export function setupSettingsLogic(router) {
             }
         });
     }
+    if (updateBtn) {
+    const setUpdated = () => {
+        updateBtn.disabled = true;
+        updateBtn.style.opacity = '.5';
+        updateBtn.style.cursor = 'not-allowed';
+        updateBtn.textContent = '✅ Sistema actualizado';
+    };
+
+    const setUpdatable = () => {
+        updateBtn.disabled = false;
+        updateBtn.style.opacity = '1';
+        updateBtn.style.cursor = 'pointer';
+        updateBtn.classList.remove('btn-secondary');
+        updateBtn.classList.add('btn-primary');
+        updateBtn.textContent = '🔄 Actualizar sistema';
+    };
+
+    // Estado inicial
+    if (PwaService.updateAvailable) setUpdatable();
+    else setUpdated();
+
+    // Escuchar actualización
+    window.addEventListener('pwa-update-available', () => {
+        setUpdatable();
+    });
+
+    updateBtn.addEventListener('click', () => {
+        if (!PwaService.updateAvailable) return;
+        updateBtn.textContent = '⏳ Actualizando...';
+        PwaService.applyUpdate();
+    });
+}
 }

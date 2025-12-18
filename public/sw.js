@@ -1,60 +1,69 @@
-const CACHE_NAME = 'pos-v2-archsell-logo';
-const ASSETS = [
+// sw.js — ArchSell POS (Vite + Netlify)
+
+const VERSION = '1.0.1'; // 🔴 CAMBIA EN CADA DEPLOY
+const STATIC_CACHE = `archsell-static-${VERSION}`;
+const RUNTIME_CACHE = 'archsell-runtime';
+
+const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/src/main.js',
-  '/src/css/global.css',
-  '/src/css/pos.css',
-  '/src/css/admin.css',
-  '/src/css/login.css'
+  '/manifest.json',
+  '/pwa-192x192.png',
+  '/pwa-512x512.png'
 ];
 
-// 1. INSTALACIÓN
-self.addEventListener('install', (e) => {
-  // Guardamos los archivos críticos
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
+// ================= INSTALL =================
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(STATIC_CACHE).then(cache => cache.addAll(STATIC_ASSETS))
   );
-  self.skipWaiting(); // Activar inmediatamente
 });
 
-// 2. ACTIVACIÓN (Limpieza)
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) return caches.delete(key);
+// ================= ACTIVATE =================
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.map(key => {
+          if (![STATIC_CACHE, RUNTIME_CACHE].includes(key)) {
+            return caches.delete(key);
+          }
         })
-      );
-    })
+      )
+    )
   );
-  self.clients.claim(); // Tomar control de las pestañas abiertas
+  self.clients.claim();
 });
 
-// 3. FETCH (ESTRATEGIA: NETWORK FIRST / RED PRIMERO)
-// Intenta ir a internet. Si falla (offline), usa la caché.
-self.addEventListener('fetch', (e) => {
-  // Solo interceptamos peticiones http/https (evita errores con chrome-extension://)
-  if (!e.request.url.startsWith('http')) return;
+// ================= FETCH =================
+self.addEventListener('fetch', event => {
+  const req = event.request;
 
-  e.respondWith(
-    fetch(e.request)
-      .then((response) => {
-        // Si la red responde bien, guardamos una copia fresca en caché para la próxima
-        if (response && response.status === 200 && e.request.method === 'GET') {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, responseClone);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Si falla la red (OFFLINE), devolvemos lo que haya en caché
-        return caches.match(e.request);
-      })
-  );
+  if (req.method !== 'GET') return;
+
+  if (req.url.includes('supabase') || req.url.includes('/api')) return;
+
+  if (req.url.includes('/assets/')) {
+    event.respondWith(
+      fetch(req)
+        .then(res => {
+          const clone = res.clone();
+          caches.open(RUNTIME_CACHE).then(c => c.put(req, clone));
+          return res;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  if (req.mode === 'navigate') {
+    event.respondWith(fetch(req).catch(() => caches.match('/index.html')));
+  }
+});
+
+// ================= MESSAGE =================
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

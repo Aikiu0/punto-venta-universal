@@ -17,7 +17,9 @@ let datosNegocio = {
     
     name: 'Mi Negocio',
     address: '',
-    phone: ''
+    phone: '',
+    logo_url: '',    // Nuevo
+    ticket_footer: ''
 };
 
 // --- UTILIDAD: Generador de UUID v4 (Para evitar duplicados) ---
@@ -170,9 +172,12 @@ export async function setupPOSLogic(router) {
                 const { data: bData } = await supabase.from('businesses').select('*').eq('id', businessId).single();
                 if (bData) {
                     datosNegocio = {
+                        id: bData.id,
                         name: bData.name || 'Mi Negocio',
                         address: bData.address || '',
-                        phone: bData.phone || ''
+                        phone: bData.phone || '',
+                        logo_url: bData.logo_url || '',        // Leemos logo
+                        ticket_footer: bData.ticket_footer || ''
                     };
                 }
             }
@@ -537,57 +542,144 @@ export async function setupPOSLogic(router) {
 
     // --- CORRECCIÓN VISUAL DEL TICKET ---
     function mostrarTicket(venta) {
-        // Usamos los datos reales cargados de Supabase
-        const s = datosNegocio;
+    const s = datosNegocio;
 
-        // Inyectamos estilos específicos para el Scroll y la Impresión
         const styleInjection = `
             <style>
                 .ticket-container {
+                color: var(--text-primary);
+                background: var(--bg-card);
+                }  
+
+                @media print {
+                .ticket-container {
+                    color: #000 !important;
+                    background: #fff !important;
+                }
+                }
+                
+                /* HEADER: Logo Izquierda - Info Derecha */
+                .ticket-header-flex {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 6px;
+                border-bottom: 1px dashed #000;
+                padding-bottom: 6px;
+                }
+
+                .ticket-logo-img {
+                    width: 40px;
+                    height: auto;
+                    flex-shrink: 0;
+                }
+
+                .ticket-info-col {
+                    text-align: right;
+                    flex-grow: 1;
+                    font-size: 11px;
+                    line-height: 1.3;
+                }
+
+                .ticket-store-name {
+                    font-weight: bold;
+                    font-size: 13px;
+                }
+                /* TABLA ITEMS */
+                .dashed-line { border-top: 1px dashed #000; margin: 5px 0; }
+                .items-header { display: flex; font-weight: bold; font-size: 0.8rem; margin-bottom: 5px; }
+                .items-header span:nth-child(1) { width: 30px; } 
+                .items-header span:nth-child(2) { flex: 1; }
+                .items-header span:nth-child(3) { width: 60px; text-align: right; }
+                
+                .ticket-item-row { display: flex; font-size: 0.85rem; margin-bottom: 3px; }
+                .t-qty { width: 30px; }
+                .t-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .t-price { width: 60px; text-align: right; }
+
+                /* TOTALES */
+                .ticket-totals { margin-top: 10px; text-align: right; }
+                .total-row { display: flex; justify-content: space-between; font-size: 0.9rem; }
+                .total-row.big { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
+
+                /* --- FOOTER CENTRADO (CORREGIDO) --- */
+                .footer-centered-container {
+                    margin-top: 20px;
+                    text-align: center !important; /* Fuerza centrado de texto */
                     display: flex;
                     flex-direction: column;
-                    max-height: 80vh; /* Altura máxima en pantalla */
+                    align-items: center; /* Centra elementos bloque */
+                    width: 100%;
                 }
-                .ticket-scroll-area {
-                    flex: 1;
-                    overflow-y: auto; /* SCROLL AUTOMÁTICO */
-                    padding-right: 5px;
-                    border-bottom: 2px dashed var(--border-color);
-                    margin-bottom: 15px;
-                }
-                .ticket-scroll-area::-webkit-scrollbar { width: 6px; }
-                .ticket-scroll-area::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
                 
-                /* FUERZA LA IMPRESIÓN COMPLETA AUNQUE HAYA SCROLL */
+                /* Textos de despedida */
+                .footer-text {
+                    font-size: 0.85rem;
+                    margin: 2px 0;
+                    width: 100%;
+                    text-align: center;
+                }
+
+                /* Caja de Leyenda (Admin) */
+                .ticket-legend-box {
+                    margin-top: 10px; 
+                    padding-top: 10px;
+                    border-top: 1px dashed #000;
+                    width: 100%;
+                    text-align: center !important; /* Centrado forzoso */
+                    font-size: 0.8rem; 
+                    font-weight: bold;
+                    white-space: pre-wrap; 
+                    padding-bottom: 30px;
+                }
+
+                /* Código de Barras */
+                #barcode {
+                    width: 100%;
+                    max-width: 1800px;
+                    height: 40px;
+                    margin: 8px auto; /* Auto margin centra bloques */
+                    display: block;
+                }
+                
                 @media print {
-                    .ticket-scroll-area {
-                        overflow: visible !important;
-                        max-height: none !important;
-                        border: none;
-                    }
-                    .modal-card {
-                        box-shadow: none;
-                        border: none;
-                        padding: 0;
-                    }
+                    .ticket-scroll-area { overflow: visible !important; max-height: none !important; border: none; }
+                    .modal-card { box-shadow: none; border: none; padding: 0; }
                     .no-print { display: none !important; }
                 }
+                    .ticket-end-space {
+                    height: 40px;
+                    }
             </style>
         `;
+
+        // Preparamos HTMLs
+        const logoHtml = s.logo_url 
+            ? `<img src="${s.logo_url}" class="ticket-logo-img" alt="Logo" onerror="this.style.display='none'">` 
+            : '';
+
+        const footerHtml = s.ticket_footer 
+            ? `<div class="ticket-legend-box">${s.ticket_footer}</div>` 
+            : '<div style="padding-bottom:20px;"></div>';
 
         modalContent.innerHTML = `
             ${styleInjection}
             <div id="printable-area" class="ticket-container">
                 <div class="ticket-scroll-area">
-                    <div class="ticket-header">
-                        <div class="ticket-store-name">${s.name}</div>
-                        ${s.address ? `<div class="ticket-meta">${s.address}</div>` : ''}
-                        ${s.phone ? `<div class="ticket-meta">Tel: ${s.phone}</div>` : ''}
-                        <div class="ticket-meta" style="margin-top:5px;">${new Date(venta.date).toLocaleString()}</div>
+                    
+                    <div class="ticket-header-flex">
+                        ${logoHtml}
+                        <div class="ticket-info-col">
+                            <div class="ticket-store-name">${s.name}</div>
+                            ${s.address ? `<div>${s.address}</div>` : ''}
+                            ${s.phone ? `<div>Tel: ${s.phone}</div>` : ''}
+                            <div style="margin-top:4px;">${new Date(venta.date).toLocaleString()}</div>
+                        </div>
                     </div>
-                    <div class="dashed-line"></div>
+                    
                     <div class="items-header"><span>CANT</span><span>DESCRIPCIÓN</span><span>IMPORTE</span></div>
                     <div class="dashed-line"></div>
+                    
                     <div style="width:100%;">
                         ${venta.items.map(i => `
                             <div class="ticket-item-row">
@@ -597,25 +689,47 @@ export async function setupPOSLogic(router) {
                             </div>
                         `).join('')}
                     </div>
+                    
                     <div class="dashed-line"></div>
                     <div class="ticket-totals">
                         <div class="total-row big"><span>TOTAL</span><span>$${venta.total.toFixed(2)}</span></div>
                         <div class="total-row"><span>Efectivo:</span><span>$${venta.payment.received.toFixed(2)}</span></div>
                         <div class="total-row"><span>Cambio:</span><span>$${venta.payment.change.toFixed(2)}</span></div>
                     </div>
-                    <div class="ticket-footer">
-                        <p>¡GRACIAS POR SU COMPRA!</p>
-                        <p>*** VUELVA PRONTO ***</p>
+                    
+                    <div class="footer-centered-container">
+                        <svg id="barcode"></svg>
+                        <div style="font-size: 0.7rem; text-align:center; margin-bottom:5px;">${venta.uuid}</div>
+
+                        <div class="footer-text">¡GRACIAS POR SU COMPRA!</div>
+                        <div class="footer-text">*** VUELVA PRONTO ***</div>
+                        
+                        ${footerHtml}
                     </div>
+
                 </div>
             </div>
             <div class="no-print" style="flex-shrink: 0; margin-top:10px; display:flex; gap:10px; flex-direction:column;">
                 <button onclick="window.print()" class="pay-btn-large" style="padding:12px; font-size:1rem; background: var(--text-primary); color: var(--bg-card);">🖨️ Imprimir</button>
                 <button id="close-ticket" style="padding:12px; border:1px solid var(--border-color); background:transparent; color:var(--text-secondary); border-radius:12px; cursor:pointer; font-weight:bold;">Cerrar</button>
             </div>
+            <div class="ticket-end-space"></div>
         `;
 
+        // Generar Código de Barras (con pequeño delay para asegurar renderizado)
+        setTimeout(() => {
+            if (window.JsBarcode) {
+                JsBarcode("#barcode", venta.uuid, {
+                    format: "CODE128",
+                    width: 1.2,
+                    height: 32,
+                    displayValue: false,
+                    margin: 0
+                });
+            }
+        }, 100);
+
         const closeBtn = document.getElementById('close-ticket');
-        if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; searchInput.focus(); });
+        if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; document.getElementById('search').focus(); });
     }
 }

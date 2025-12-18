@@ -240,10 +240,10 @@ export function renderAdminBilling() {
 
                         <div style="display:flex; gap:20px; margin-top:40px;">
                             <button id="btn-preview" class="btn-secondary" style="flex:1;">
-                                👁️ Vista Previa PDF
+                                 Vista Previa PDF
                             </button>
                             <button id="btn-timbrar" class="btn-primary" style="flex:2;">
-                                🚀 Timbrar Factura
+                                 Timbrar Factura
                             </button>
                         </div>
                     </div>
