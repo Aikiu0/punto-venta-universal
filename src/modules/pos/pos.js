@@ -78,7 +78,7 @@ export function renderPOS() {
 
             <div class="catalog-panel">
                 <div class="catalog-header">
-                    <div class="search-wrapper"><span class="search-icon">🔍</span><input type="text" id="search" class="search-input" placeholder="Buscar producto..." autocomplete="off"></div>
+                    <div class="search-wrapper"><span class="search-icon"></span><input type="text" id="search" class="search-input" placeholder="Buscar producto..." autocomplete="off"></div>
                     <div style="display:flex; gap:5px;">
                         <button id="btn-view-list" class="view-btn active" title="Lista">☰</button>
                         <button id="btn-view-grid" class="view-btn" title="Cuadrícula">田</button>

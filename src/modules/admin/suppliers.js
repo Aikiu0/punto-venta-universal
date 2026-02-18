@@ -184,26 +184,24 @@ export function renderSuppliers() {
                     ${renderSidebarHeader()}
                 </div>
                 <nav class="sidebar-menu">
-                    <button class="menu-item" id="nav-dash">📊 Dashboard</button>
+                    <button class="menu-item" id="nav-dash"> Dashboard</button>
                     <button class="menu-item" id="nav-orders" onclick="window.checkPlan(event, 'web_orders')">
-                        ${lockOrders}🔔 Pedidos Web
+                        ${lockOrders} Pedidos Web
                     </button>
-                    <button class="menu-item" id="nav-inventory">📦 Inventario</button>
-                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
+                    <button class="menu-item" id="nav-inventory"> Inventario</button>
+                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
                     
-                    <button class="menu-item active">🚚 ${PAGE_TITLE}</button>
+                    <button class="menu-item active"> ${PAGE_TITLE}</button>
                     
                     <button class="menu-item" id="nav-history" onclick="window.checkPlan(event, 'history')">
-                        ${lockHistory}📅 Historial
+                        ${lockHistory} Historial
                     </button>
 
-                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
-                        ${lockBilling}💎 Facturación
-                    </button>
+                    
                     <button class="menu-item" id="nav-settings" onclick="window.checkPlan(event, 'settings')">
-                        ${lockSettings}⚙️ Configuración
+                        ${lockSettings} Configuración
                     </button>
-                    <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
+                    <button class="menu-item logout" id="nav-logout"> Salir</button>
                 </nav>
             </aside>
 

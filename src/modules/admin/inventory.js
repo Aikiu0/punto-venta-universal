@@ -24,6 +24,7 @@ export function renderAdminInventory() {
     const canExport = PermissionService.can('export_excel');
     const lockExport = canExport ? '' : '🔒';
     const opacityExport = canExport ? '1' : '0.6';
+    
 
     return `
         <div class="admin-container">
@@ -34,28 +35,25 @@ export function renderAdminInventory() {
                     ${renderSidebarHeader()}
                 </div>
                 <nav class="sidebar-menu">
-                    <button class="menu-item" id="nav-dash">📊 Dashboard</button>
+                    <button class="menu-item" id="nav-dash"> Dashboard</button>
                     
                     <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
-                        ${lockOrders}🔔 Pedidos Web
+                        ${lockOrders} Pedidos Web
                     </button>
                     
-                    <button class="menu-item active">📦 Inventario</button>
+                    <button class="menu-item active"> Inventario</button>
                     
-                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                     <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers}🚚 Proveedores</button>
+                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Proveedores</button>
                     
                     <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
-                        ${lockHistory}📅 Historial
-                    </button>
-                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
-                    ${lockBilling}💎 Facturación
+                        ${lockHistory} Historial
                     </button>
                     <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event, 'settings')">
-                        ${lockSettings}⚙️ Configuración
+                        ${lockSettings} Configuración
                     </button>
                     
-                    <button class="menu-item logout" id="nav-logout" style="margin-top:auto; color:var(--danger-color);">🚪 Salir</button>
+                    <button class="menu-item logout" id="nav-logout" style="margin-top:auto; color:var(--danger-color);"> Salir</button>
                 </nav>
             </aside>
 
@@ -95,10 +93,10 @@ export function renderAdminInventory() {
 
                 <div class="card-panel">
                     <div style="margin-bottom: 20px; display:flex; gap:10px;">
-                        <input type="text" id="inventory-search" placeholder="🔍 Buscar por nombre, código o categoría..." 
+                        <input type="text" id="inventory-search" placeholder=" Buscar por nombre, código o categoría..." 
                             style="width: 100%; padding: 12px; border: 1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius: 8px; font-size: 1rem; outline: none;">
                     </div>
-
+                <div style="overflow-x:auto;">
                     <table class="modern-table">
                         <thead>
                             <tr>
@@ -114,7 +112,7 @@ export function renderAdminInventory() {
                             <tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-secondary);">Cargando inventario...</td></tr>
                         </tbody>
                     </table>
-                </div>
+                </div></div>
             </main>
 
             <div id="product-modal" class="admin-modal">

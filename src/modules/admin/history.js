@@ -122,6 +122,7 @@ const styles = `
         font-weight: 600;
         margin-left: 8px;
     }
+    
 
     /* Badges */
     .badge-type { padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; }
@@ -140,18 +141,27 @@ const styles = `
 export function renderHistory() {
     const s = SettingsService.get();
 
-    // --- CONTENIDO CENTRAL ---
-    const contentHTML = `
+    // 1. DEFINIMOS EL HEADER UNIFICADO (Con botón hamburguesa siempre presente)
+    // Usamos este header tanto para carga parcial como total para evitar que el botón desaparezca.
+    const headerHTML = `
         <header class="content-header">
-            <div>
-                <h1>Historial de Ventas</h1>
-                <p style="color:var(--text-secondary)">Reporte detallado de movimientos</p>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer;">☰</button>
+                
+                <div class="page-title">
+                    <h1>Historial de Ventas</h1>
+                    <p style="color:var(--text-secondary); font-size:0.9rem; margin:0;">Reporte detallado de movimientos</p>
+                </div>
             </div>
-            <div class="header-actions">
+            
+            <div class="header-actions" style="display:flex; align-items:center; gap:10px;">
+                 <span style="font-weight:bold; color:var(--text-primary); display:none; display:md-block;">${new Date().toLocaleDateString()}</span>
                  <button id="btn-toggle-theme" class="btn-icon" title="Cambiar Tema" style="background:var(--bg-card); border:1px solid var(--border-color); cursor:pointer; padding:8px; border-radius:8px; font-size:1.2rem; transition: all 0.3s ease;">🌓</button>
             </div>
         </header>
+    `;
 
+    const bodyHTML = `
         <div class="card-panel" style="background:transparent; padding:0; box-shadow:none; border:none;">
             <div id="history-loading" style="text-align:center; padding:50px; font-size:1.2rem; color:var(--text-secondary);">
                 ⏳ Cargando historial...
@@ -160,26 +170,23 @@ export function renderHistory() {
         </div>
     `;
 
-    // --- LÓGICA ANTI-SALTO (Renderizado Condicional) ---
+    // --- LÓGICA ANTI-SALTO (Navegación sin recarga) ---
     const existingContainer = document.querySelector('.admin-container');
 
     if (existingContainer) {
-        // 1. Inyectamos solo el contenido central
+        // Inyectamos Header + Body en el contenido principal
         const mainContent = existingContainer.querySelector('.admin-content');
-        if (mainContent) mainContent.innerHTML = contentHTML;
+        if (mainContent) mainContent.innerHTML = headerHTML + bodyHTML;
 
-        // 2. Actualizamos la clase 'active' del menú
+        // Actualizamos menú activo
         existingContainer.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
-        // Intentamos buscar por ID, si falla (porque dashboard.js no puso IDs), buscamos por texto
         let navBtn = existingContainer.querySelector('#nav-history');
         if (!navBtn) {
-            // Fallback: buscar por texto si venimos de Dashboard
             const buttons = existingContainer.querySelectorAll('.menu-item');
             navBtn = Array.from(buttons).find(b => b.textContent.includes('Historial'));
         }
         if (navBtn) navBtn.classList.add('active');
 
-        // 3. Estilos
         if (!document.getElementById('history-styles')) {
             document.head.insertAdjacentHTML('beforeend', styles);
         }
@@ -187,78 +194,101 @@ export function renderHistory() {
         return existingContainer.parentNode.innerHTML;
     }
 
-    // --- RENDERIZADO COMPLETO (Si se entra directo) ---
+    // --- RENDERIZADO COMPLETO (Recarga de página) ---
     const canOrders = (PermissionService && PermissionService.can) ? PermissionService.can('web_orders') : true;
     const lockOrders = canOrders ? '' : '🔒 ';
     const lockSuppliers = PermissionService.can('suppliers') ? '' : '🔒 ';
-    const lockBilling = PermissionService.can('billing') ? '' : '🔒 ';
 
     return `
         ${styles}
         <div class="admin-container">
-            <aside class="admin-sidebar">
+            <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+            <aside class="admin-sidebar" id="admin-sidebar">
                 ${renderSidebarHeader()} 
                 <nav class="sidebar-menu" id="sidebar-menu-nav">
-                    <button class="menu-item" id="nav-dash">📊 Dashboard</button>
+                    <button class="menu-item" id="nav-dash"> Dashboard</button>
                     <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
-                        ${lockOrders}🔔 Pedidos Web
+                        ${lockOrders} Pedidos Web
                     </button>
-                    <button class="menu-item" id="nav-inventory">📦 Inventario</button>
-                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers}🚚 Proveedores</button>
-                    <button class="menu-item active" id="nav-history">📅 Historial</button>
-                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
-                    ${lockBilling}💎 Facturación
-                    </button>
-                    <button class="menu-item" id="nav-settings">⚙️ Configuración</button>
+                    <button class="menu-item" id="nav-inventory"> Inventario</button>
+                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Proveedores</button>
+                    <button class="menu-item active" id="nav-history"> Historial</button>
+                    <button class="menu-item" id="nav-settings"> Configuración</button>
                     <div style="flex:1"></div>
-                    <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
+                    <button class="menu-item logout" id="nav-logout"> Salir</button>
                 </nav>
             </aside>
 
             <main class="admin-content">
-                ${contentHTML}
+                ${headerHTML}
+                ${bodyHTML}
             </main>
         </div>
     `;
 }
-
 export function setupHistoryLogic(router) {
     const navTo = (p) => router.navigate(p);
+
+    // --- 1. LÓGICA DEL MENÚ HAMBURGUESA (NUEVO) ---
+    setTimeout(() => {
+        const menuBtn = document.getElementById('mobile-menu-btn');
+        // Buscamos el sidebar por ID, o por clase si ya existía de antes
+        const sidebar = document.getElementById('admin-sidebar') || document.querySelector('.admin-sidebar');
+        const overlay = document.getElementById('sidebar-overlay') || document.querySelector('.sidebar-overlay');
+
+        function toggleMenu(show) {
+            if(!sidebar) return;
+            if (show) {
+                sidebar.classList.add('active');
+                if(overlay) overlay.classList.add('active');
+            } else {
+                sidebar.classList.remove('active');
+                if(overlay) overlay.classList.remove('active');
+            }
+        }
+
+        if (menuBtn) {
+            // Clonamos para eliminar listeners previos (evita doble toggle)
+            const newBtn = menuBtn.cloneNode(true);
+            menuBtn.parentNode.replaceChild(newBtn, menuBtn);
+            newBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleMenu(true);
+            });
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', () => toggleMenu(false));
+        }
+    }, 100);
     
-    // 1. Configuración ROBUSTA de Listeners del Menú
-    // Usamos selectores genéricos primero para asegurar que encontramos los elementos
-    // independientemente de si dashboard.js o history.js creó la barra lateral.
     
+    // --- 2. LISTENERS DEL SIDEBAR ---
     const sidebarNav = document.getElementById('sidebar-menu-nav') || document.querySelector('.sidebar-menu');
     
     if (sidebarNav && sidebarNav.dataset.listenersAttached !== 'true') {
-        
-        // Función auxiliar para buscar botón por ID o por Texto (Fallback)
         const bindSmart = (id, textMatch, path) => {
             let el = document.getElementById(id);
             if (!el && textMatch) {
-                // Si no hay ID, buscamos por el texto dentro del botón
                 const buttons = sidebarNav.querySelectorAll('.menu-item');
                 el = Array.from(buttons).find(b => b.textContent.includes(textMatch));
             }
             if (el) {
-                // Clonamos el nodo para limpiar listeners viejos si es necesario, o solo agregamos
                 el.onclick = (e) => {
-                    e.preventDefault(); // Prevenir comportamientos raros
+                    e.preventDefault(); 
                     navTo(path);
                 };
             }
         };
 
-        // VINCULACIÓN DE RUTAS (CORREGIDO: Dashboard va a '/admin', no '/admin/dashboard')
         bindSmart('nav-dash', 'Dashboard', '/admin'); 
         bindSmart('nav-orders', 'Pedidos', '/admin/orders');
         bindSmart('nav-inventory', 'Inventario', '/admin/inventory');
         bindSmart('nav-pos', 'Caja', '/pos');
         bindSmart('nav-settings', 'Configuración', '/admin/settings');
         bindSmart('nav-suppliers', 'Proveedores', '/admin/suppliers');
-        bindSmart('nav-billing', 'Facturación', '/admin/billing');
         
         const logoutBtn = document.getElementById('nav-logout') || sidebarNav.querySelector('.logout');
         if(logoutBtn) logoutBtn.addEventListener('click', async () => { await supabase.auth.signOut(); router.navigate('/'); });
@@ -266,13 +296,13 @@ export function setupHistoryLogic(router) {
         sidebarNav.dataset.listenersAttached = 'true';
     }
 
-    // 2. BOTÓN DE MODO OSCURO
+    // 3. BOTÓN DE MODO OSCURO
     const btnTheme = document.getElementById('btn-toggle-theme');
     if(btnTheme) {
         btnTheme.addEventListener('click', () => ThemeService.toggle());
     }
-
-    // 3. Cargar Datos
+    
+    // 4. Cargar Datos
     loadHistory();
 }
 
@@ -438,65 +468,65 @@ function renderHistoryUI(report) {
             </div>
 
             <div id="details-${key}" class="history-details">
-                <table class="detail-table">
-                    <thead>
-                        <tr>
-                            <th style="width:15%">Fecha</th>
-                            <th style="width:10%">Origen</th>
-                            <th style="width:55%">Desglose de Productos</th>
-                            <th style="width:20%; text-align:right">Total Venta</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.transactions.map(t => {
-                            let itemsHtml = '';
-                            if (t.itemsList && t.itemsList.length > 0) {
-                                itemsHtml = t.itemsList.map(i => {
-                                    if(i.type === 'meta') return '';
-                                    const qty = i.cantidad || i.qty || 1; 
-                                    const price = i.price || 0;
-                                    const subTotal = qty * price;
-                                    
-                                    return `
-                                    <div class="product-list-item">
-                                        <span style="font-weight:500;">
-                                            ${qty}x ${i.name || i.product_name || 'Producto'}
-                                        </span>
-                                        <span>
-                                            <span class="item-price-info">($${price.toFixed(2)})</span>
-                                            <span class="item-total-info">⮕ $${subTotal.toFixed(2)}</span>
-                                        </span>
-                                    </div>
-                                    `;
-                                }).join('');
-                            } else {
-                                itemsHtml = '<span style="color:var(--text-secondary); font-style:italic;">Sin detalles de productos</span>';
-                            }
-
-                            return `
+                <div style="overflow-x:auto;">
+                    <table class="detail-table" style="min-width: 600px;"> <thead>
                             <tr>
-                                <td>
-                                    <div style="font-weight:bold;">${t.dateObj.toLocaleDateString()}</div>
-                                    <div style="font-size:0.8em; color:var(--text-secondary);">${t.dateObj.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
-                                </td>
-                                <td>
-                                    <span class="badge-type ${t.origin === 'local' ? 'badge-local' : 'badge-web'}">
-                                        ${t.origin === 'local' ? 'CAJA' : 'WEB'}
-                                    </span>
-                                </td>
-                                <td>
-                                    ${itemsHtml}
-                                    ${t.customer_name ? `<div style="margin-top:4px; font-size:0.8em; color:var(--text-primary); font-weight:bold; border-top:1px dotted var(--border-color); padding-top:2px;">👤 ${t.customer_name}</div>` : ''}
-                                </td>
-                                <td style="text-align:right; font-weight:bold; color:var(--text-primary); font-size:1.1em;">
-                                    ${fmtMoney(t.total)}
-                                </td>
+                                <th style="width:15%">Fecha</th>
+                                <th style="width:10%">Origen</th>
+                                <th style="width:55%">Desglose de Productos</th>
+                                <th style="width:20%; text-align:right">Total Venta</th>
                             </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-                <div style="text-align:center; padding:15px; font-size:0.8rem; color:var(--text-secondary);">
+                        </thead>
+                        <tbody>
+                            ${data.transactions.map(t => {
+                                let itemsHtml = '';
+                                if (t.itemsList && t.itemsList.length > 0) {
+                                    itemsHtml = t.itemsList.map(i => {
+                                        if(i.type === 'meta') return '';
+                                        const qty = i.cantidad || i.qty || 1; 
+                                        const price = i.price || 0;
+                                        const subTotal = qty * price;
+                                        
+                                        return `
+                                        <div class="product-list-item">
+                                            <span style="font-weight:500;">
+                                                ${qty}x ${i.name || i.product_name || 'Producto'}
+                                            </span>
+                                            <span>
+                                                <span class="item-price-info">($${price.toFixed(2)})</span>
+                                                <span class="item-total-info">⮕ $${subTotal.toFixed(2)}</span>
+                                            </span>
+                                        </div>
+                                        `;
+                                    }).join('');
+                                } else {
+                                    itemsHtml = '<span style="color:var(--text-secondary); font-style:italic;">Sin detalles de productos</span>';
+                                }
+
+                                return `
+                                <tr>
+                                    <td>
+                                        <div style="font-weight:bold;">${t.dateObj.toLocaleDateString()}</div>
+                                        <div style="font-size:0.8em; color:var(--text-secondary);">${t.dateObj.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge-type ${t.origin === 'local' ? 'badge-local' : 'badge-web'}">
+                                            ${t.origin === 'local' ? 'CAJA' : 'WEB'}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        ${itemsHtml}
+                                        ${t.customer_name ? `<div style="margin-top:4px; font-size:0.8em; color:var(--text-primary); font-weight:bold; border-top:1px dotted var(--border-color); padding-top:2px;">👤 ${t.customer_name}</div>` : ''}
+                                    </td>
+                                    <td style="text-align:right; font-weight:bold; color:var(--text-primary); font-size:1.1em;">
+                                        ${fmtMoney(t.total)}
+                                    </td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div> <div style="text-align:center; padding:15px; font-size:0.8rem; color:var(--text-secondary);">
                     Fin de registros de ${data.name}
                 </div>
             </div>

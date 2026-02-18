@@ -27,7 +27,7 @@ function renderMarketplace() {
                 <h1 class="marketplace-title">Bienvenido a ArchSell</h1>
                 <p class="marketplace-subtitle">Descubre las mejores ferreterías y proveedores cerca de ti.</p>
                 <div class="search-container">
-                    <input type="text" id="store-finder" class="store-search-input" placeholder="🔍 Buscar ferretería...">
+                    <input type="text" id="store-finder" class="store-search-input" placeholder=" Buscar ferretería...">
                 </div>
             </div>
             
@@ -82,7 +82,7 @@ function renderStoreUI(business) {
 
                 <main>
                     <div style="margin-bottom:20px; position:relative;">
-                        <input type="text" id="product-search" placeholder="🔍 ¿Qué estás buscando?" 
+                        <input type="text" class="search-container "id="product-search" placeholder=" ¿Qué estás buscando?" 
                             style="width:100%; padding:15px 20px; border-radius:12px; border:1px solid #e2e8f0; font-size:1rem; box-shadow:0 2px 5px rgba(0,0,0,0.02); outline:none;">
                     </div>
 
@@ -351,9 +351,9 @@ export async function setupShopLogic(router) {
                     <input type="text" id="client-name" placeholder="Tu Nombre Completo" required style="width:100%; padding:14px; margin-bottom:10px; border:1px solid #e2e8f0; border-radius:10px;">
                     <input type="text" id="client-phone" placeholder="WhatsApp / Teléfono" required style="width:100%; padding:14px; margin-bottom:10px; border:1px solid #e2e8f0; border-radius:10px;">
                     <select id="payment-method" style="width:100%; padding:14px; margin-bottom:20px; border:1px solid #e2e8f0; border-radius:10px;">
-                        <option value="efectivo">💵 Efectivo (Contra entrega)</option>
-                        <option value="tarjeta">💳 Tarjeta (En tienda)</option>
-                        <option value="transferencia">📲 Transferencia</option>
+                        <option value="efectivo"> Efectivo (Contra entrega)</option>
+                        <option value="tarjeta"> Tarjeta (En tienda)</option>
+                        <option value="transferencia"> Transferencia</option>
                     </select>
                     <button id="btn-checkout" style="width:100%; padding:16px; background:${currentBusiness.primary_color || '#7A3F9D'}; color:white; border:none; border-radius:10px; font-weight:bold; font-size:1.1rem; cursor:pointer;">Confirmar Pedido</button>
                 </div>

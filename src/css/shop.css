@@ -35,8 +35,12 @@
 
 .search-container {
     position: relative;
-    max-width: 600px;
-    margin: 0 auto;
+    width: 100%;           /* AGREGADO: Obliga a ocupar el espacio disponible */
+    max-width: 600px;      /* Mantiene el límite para que no se vea gigante */
+    margin: 0 auto;        /* Ahora sí calcula el centro perfecto */
+    display: flex;         /* AGREGADO: Asegura que el input hijo se centre */
+    justify-content: center;
+    box-sizing: border-box; /* AGREGADO: Evita que el padding descuadre el ancho */
 }
 
 .store-search-input {

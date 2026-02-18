@@ -5,30 +5,33 @@ import { renderSidebarHeader } from './components/sidebarHeader.js';
 export function renderAdminOrders() {
     return `
         <div class="admin-container">
-            <aside class="admin-sidebar">
+            <div class="sidebar-overlay" id="sidebar-overlay"></div>
+            <aside class="admin-sidebar" id="admin-sidebar">
                 <div class="sidebar-logo">
                 ${renderSidebarHeader()}
                 </div>
                 <nav class="sidebar-menu">
-                    <button class="menu-item" id="nav-dash">📊 Dashboard</button>
-                    <button class="menu-item active">🔔 Pedidos Web</button>
-                    <button class="menu-item" id="nav-inventory">📦 Inventario</button>
-                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">🚚 Proveedores</button>
-                    <button class="menu-item" id="nav-history">📅 Historial</button>
-                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
-                    💎 Facturación
-                    </button>
-                    <button class="menu-item" id="nav-settings">⚙️ Configuración</button>
-                    <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
+                    <button class="menu-item" id="nav-dash"> Dashboard</button>
+                    <button class="menu-item active"> Pedidos Web</button>
+                    <button class="menu-item" id="nav-inventory"> Inventario</button>
+                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')"> Proveedores</button>
+                    <button class="menu-item" id="nav-history"> Historial</button>
+                    
+                    <button class="menu-item" id="nav-settings"> Configuración</button>
+                    <button class="menu-item logout" id="nav-logout"> Salir</button>
                 </nav>
             </aside>
 
             <main class="admin-content">
                 <header class="content-header">
-                    <div class="page-title">
-                        <h1>Pedidos en Línea</h1>
-                        <p>Gestiona las órdenes de "Click & Collect"</p>
+
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer;">☰</button>
+                        
+                        <div class="page-title">
+                            <h1>Pedidos en Línea</h1>
+                        </div>
                     </div>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <button id="theme-toggle-orders" class="icon-btn" title="Cambiar Tema" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); width:40px; height:40px; border-radius:8px; cursor:pointer; display:flex; justify-content:center; align-items:center;">
@@ -48,13 +51,30 @@ export function renderAdminOrders() {
 }
 
 export async function setupOrdersLogic(router) {
+    const sidebar = document.getElementById('admin-sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const btnOpen = document.getElementById('mobile-menu-btn');
+    const btnClose = document.getElementById('btn-close-sidebar');
+    
+    // Fix para botón cerrar en móvil
+    if (window.innerWidth <= 768 && btnClose) btnClose.style.display = 'block';
+
+    function toggleMenu(show) {
+        if (show) { sidebar && sidebar.classList.add('active'); overlay && overlay.classList.add('active'); }
+        else { sidebar && sidebar.classList.remove('active'); overlay && overlay.classList.remove('active'); }
+    }
+    if (btnOpen) btnOpen.addEventListener('click', () => toggleMenu(true));
+    if (btnClose) btnClose.addEventListener('click', () => toggleMenu(false));
+    if (overlay) overlay.addEventListener('click', () => toggleMenu(false));
+
+    const navigateTo = (path) => { toggleMenu(false); router.navigate(path); };
     // 1. Navegación
     document.getElementById('nav-dash').addEventListener('click', () => router.navigate('/admin'));
     document.getElementById('nav-inventory').addEventListener('click', () => router.navigate('/admin/inventory'));
     document.getElementById('nav-pos').addEventListener('click', () => router.navigate('/pos'));
     document.getElementById('nav-settings').addEventListener('click', () => router.navigate('/admin/settings'))
     document.getElementById('nav-history').addEventListener('click', () => router.navigate('/admin/history'));
-    document.getElementById('nav-billing').addEventListener('click', () => router.navigate('/admin/billing'));
+    
     document.getElementById('nav-suppliers').addEventListener('click', () => router.navigate('/admin/suppliers'));
     document.getElementById('nav-logout').addEventListener('click', async () => { 
         supabase.removeAllChannels();
@@ -128,8 +148,8 @@ export async function setupOrdersLogic(router) {
                     </div>
                 </div>
                 <div style="margin-bottom:15px; font-size:0.9rem; color:var(--text-secondary);">
-                    <p style="margin:5px 0;">📞 ${order.customer_contact}</p>
-                    <p style="margin:5px 0;">💳 ${method.toUpperCase()}</p>
+                    <p style="margin:5px 0;">Número de teléfono: ${order.customer_contact}</p>
+                    <p style="margin:5px 0;">Método de pago: ${method.toUpperCase()}</p>
                 </div>
                 <button class="btn-primary btn-deliver" style="width:100%; justify-content:center; background:var(--success-bg); color:white;">✅ Entregar y Cobrar</button>
             `;

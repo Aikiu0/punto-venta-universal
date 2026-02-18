@@ -93,17 +93,14 @@ export function renderDashboard() {
                     ${renderSidebarHeader()}
                 </div>
                 <nav class="sidebar-menu">
-                    <button class="menu-item active">📊 Dashboard</button>
-                    <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">${lockOrders}🔔 Pedidos Web</button>
-                    <button class="menu-item" id="nav-inventory">📦 Inventario</button>
-                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers}🚚 Proveedores</button>
-                    <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">${lockHistory}📅 Historial</button>
-                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
-                    ${lockBilling}💎 Facturación
-                    </button>
-                    <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event, 'settings')">${lockSettings}⚙️ Configuración</button>
-                    <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
+                    <button class="menu-item active"> Dashboard</button>
+                    <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">${lockOrders} Pedidos Web</button>
+                    <button class="menu-item" id="nav-inventory"> Inventario</button>
+                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Proveedores</button>
+                    <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">${lockHistory} Historial</button>
+                    <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event, 'settings')">${lockSettings} Configuración</button>
+                    <button class="menu-item logout" id="nav-logout"> Salir</button>
                 </nav>
             </aside>
 
@@ -148,7 +145,7 @@ export function renderDashboard() {
                      
                      <div class="card-panel premium-blur-container anim-stagger delay-4">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <h3 style="color:var(--text-primary); margin:0;">📈 Rendimiento (7 Días)</h3>
+                            <h3 style="color:var(--text-primary); margin:0;"> Rendimiento (7 Días)</h3>
                             <small style="color:var(--text-secondary); font-size:0.7rem;">Ventas vs Costos</small>
                         </div>
                         ${chartOverlay} 
@@ -158,7 +155,7 @@ export function renderDashboard() {
                      </div>
 
                      <div class="card-panel premium-blur-container anim-stagger delay-5">
-                        <h3 style="margin-bottom:20px; color:var(--text-primary);">🏆 Top Productos</h3>
+                        <h3 style="margin-bottom:20px; color:var(--text-primary);"> Top Productos</h3>
                         ${chartOverlay}
                         <div class="${chartBlurClass}" style="position:relative; height:300px; width:100%;">
                             <canvas id="topProductsChart"></canvas>
@@ -556,7 +553,7 @@ export async function setupDashboardLogic(router) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '70%', // Dona más delgada (look moderno)
+                cutout: '70%', // Dona
                 animation: {
                     animateScale: true,
                     animateRotate: true

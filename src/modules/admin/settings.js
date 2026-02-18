@@ -18,34 +18,39 @@ export function renderAdminSettings() {
     const footer = s.ticket_footer || '';
     return `
         <div class="admin-container">
-            <aside class="admin-sidebar">
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+            <aside class="admin-sidebar" id="admin-sidebar">
                 <div class="sidebar-logo">
                     ${renderSidebarHeader()}
                 </div>
-                <nav class="sidebar-menu">
-                    <button class="menu-item" id="nav-dash">📊 Dashboard</button>
+                <nav class="sidebar-menu" id="sidebar-menu-nav">
+                    <button class="menu-item" id="nav-dash"> Dashboard</button>
                     
                     <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
-                        ${lockOrders}🔔 Pedidos Web
+                        ${lockOrders} Pedidos Web
                     </button>
                     
-                    <button class="menu-item" id="nav-inventory">📦 Inventario</button>
-                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers}🚚 Proveedores</button>
+                    <button class="menu-item" id="nav-inventory"> Inventario</button>
+                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Proveedores</button>
                     <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
-                        ${lockHistory}📅 Historial
+                        ${lockHistory} Historial
                     </button>
-                    <button class="menu-item" id="nav-billing" onclick="window.checkPlan(event, 'billing')">
-                    ${lockBilling}💎 Facturación
-                    </button>
-                    <button class="menu-item active">⚙️ Configuración</button>
-                    <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
+                    
+                    <button class="menu-item active"> Configuración</button>
+                    <button class="menu-item logout" id="nav-logout"> Salir</button>
                 </nav>
             </aside>
 
             <main class="admin-content">
                 <header class="content-header">
-                    <div class="page-title"><h1>Configuración</h1></div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer;">☰</button>
+                        
+                        <div class="page-title">
+                            <h1>Configuración</h1>
+                        </div>
+                    </div>
                 </header>
 
                 <div class="card-panel" style="max-width: 600px;">
@@ -53,7 +58,7 @@ export function renderAdminSettings() {
                         <img id="preview-img" src="${logoUrl || 'https://via.placeholder.com/100?text=Logo'}" style="height:100px; object-fit:contain; border-radius:10px; border:1px dashed #ccc;">
                         <br>
                         <label class="btn-primary" style="display:inline-flex; margin-top:10px; cursor:pointer; width:auto;">
-                            📷 Cambiar Logo <input type="file" id="logo-upload" hidden accept="image/*">
+                            Cambiar Logo <input type="file" id="logo-upload" hidden accept="image/*">
                         </label>
                     </div>
 
@@ -89,6 +94,42 @@ export function renderAdminSettings() {
 }
 
 export function setupSettingsLogic(router) {
+    setTimeout(() => {
+        const menuBtn = document.getElementById('mobile-menu-btn');
+        // Buscamos el sidebar por ID, o por clase si ya existía de antes
+        const sidebar = document    .getElementById('admin-sidebar') || document.querySelector('.admin-sidebar');
+        const overlay = document.getElementById('sidebar-overlay') || document.querySelector('.sidebar-overlay');
+
+        function toggleMenu(show) {
+            if(!sidebar) return;
+            if (show) {
+                sidebar.classList.add('active');
+                if(overlay) overlay.classList.add('active');
+            } else {
+                sidebar.classList.remove('active');
+                if(overlay) overlay.classList.remove('active');
+            }
+        }
+
+        if (menuBtn) {
+            // Clonamos para eliminar listeners previos (evita doble toggle)
+            const newBtn = menuBtn.cloneNode(true);
+            menuBtn.parentNode.replaceChild(newBtn, menuBtn);
+            newBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleMenu(true);
+            });
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', () => toggleMenu(false));
+        }
+    }, 100);
+    
+    
+    // --- 2. LISTENERS DEL SIDEBAR ---
+    const sidebarNav = document.getElementById('sidebar-menu-nav') || document.querySelector('.sidebar-menu');
+    
     // 1. Configuración de navegación básica
     const navTo = (p) => router.navigate(p);
     const bindNav = (id, path) => {
@@ -298,5 +339,7 @@ export function setupSettingsLogic(router) {
         updateBtn.textContent = '⏳ Actualizando...';
         PwaService.applyUpdate();
     });
+
+    
 }
 }
