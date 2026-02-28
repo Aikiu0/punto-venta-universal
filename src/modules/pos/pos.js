@@ -1,4 +1,4 @@
-// src/modules/pos/pos.js - POS FINAL: DATOS NEGOCIO REALES + TICKET SCROLLABLE + FIX DUPLICADOS
+// src/modules/pos/pos.js - POS BLINDADO: ANTI-CONGELAMIENTOS + ENTER + FIX DUPLICADOS
 import { db } from '../../data/db-local.js';
 import { supabase } from '../../data/supabase.js';
 import { syncService } from '../../services/sync.js';
@@ -9,20 +9,21 @@ let productosGlobal = [];
 let totalVenta = 0;
 let audioContext = null;
 let ordersCheckInterval = null;
-// --- FIX: Flag para evitar múltiples sincronizaciones simultáneas ---
 let isSyncing = false; 
 
-// Variable para guardar los datos frescos de la tabla 'businesses'
+// --- FIX 2: Variables globales para evitar canales clones de Supabase y escuchas repetidas ---
+let realtimeProductsChannel = null;
+let realtimeOrdersChannel = null;
+let isDocumentListenerAdded = false;
+
 let datosNegocio = {
-    
     name: 'Mi Negocio',
     address: '',
     phone: '',
-    logo_url: '',    // Nuevo
+    logo_url: '',
     ticket_footer: ''
 };
 
-// --- UTILIDAD: Generador de UUID v4 (Para evitar duplicados) ---
 function uuidv4() {
     return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
         (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
@@ -33,46 +34,16 @@ export function renderPOS() {
     return `
         <div class="pos-layout">
             <style>
-                /* --- ESTILOS OPTIMIZADOS --- */
-                .products-grid {
-                    display: grid;
-                    gap: 12px;
-                    padding: 15px;
-                    overflow-y: auto;
-                    height: calc(100vh - 150px);
-                    align-content: start;
-                }
-
-                /* MODO LISTA */
+                .products-grid { display: grid; gap: 12px; padding: 15px; overflow-y: auto; height: calc(100vh - 150px); align-content: start; }
                 .products-grid.list-mode { grid-template-columns: 1fr; }
-                .products-grid.list-mode .product-card {
-                    display: grid;
-                    grid-template-columns: 1fr auto;
-                    align-items: center;
-                    padding: 16px 20px;
-                    background: var(--bg-card);
-                    border: 1px solid var(--border-color);
-                    border-radius: 12px;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
-                    cursor: pointer;
-                    min-height: 80px;
-                }
+                .products-grid.list-mode .product-card { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 16px 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); cursor: pointer; min-height: 80px; }
                 .products-grid.list-mode .prod-name { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; line-height: 1.3; }
                 .products-grid.list-mode .prod-meta { display: flex; gap: 10px; align-items: center; font-size: 0.85rem; color: var(--text-secondary); }
                 .products-grid.list-mode .prod-price { font-size: 1.4rem; font-weight: 800; color: var(--brand-color); text-align: right; padding-left: 15px; border-left: 1px solid var(--border-color); margin-left: 15px; }
-
-                /* MODO CUADRÍCULA */
                 .products-grid.grid-mode { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-                .products-grid.grid-mode .product-card {
-                    display: flex; flex-direction: column; justify-content: space-between;
-                    height: 180px; padding: 15px; background: var(--bg-card);
-                    border: 1px solid var(--border-color); border-radius: 12px;
-                    cursor: pointer; text-align: center;
-                }
+                .products-grid.grid-mode .product-card { display: flex; flex-direction: column; justify-content: space-between; height: 180px; padding: 15px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; cursor: pointer; text-align: center; }
                 .products-grid.grid-mode .prod-name { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
                 .products-grid.grid-mode .prod-price { font-size: 1.2rem; font-weight: bold; color: var(--brand-color); margin-top: 10px; }
-
-                /* Badges */
                 .stock-badge { padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.5px; text-transform: uppercase; }
             </style>
 
@@ -137,21 +108,20 @@ export async function setupPOSLogic(router) {
     const businessId = localStorage.getItem('archsell_business_id');
     
     if (!businessId) console.warn("⚠️ No se encontró ID de negocio.");
+    
     async function safeSync() {
         if (isSyncing || !navigator.onLine) return;
         isSyncing = true;
         const btn = document.getElementById('btn-sync');
-        if(btn) btn.innerHTML = "⏳"; // Feedback visual
+        if(btn) btn.innerHTML = "⏳";
 
         try {
-            console.log("🔄 Iniciando sincronización segura...");
             await syncService.uploadSales();
             await db.products.clear();
             await syncService.downloadProducts();
             productosGlobal = await db.products.toArray();
             renderGrid(productosGlobal);
             checkPendingOrders();
-            console.log("✅ Sincronización terminada");
         } catch (e) {
             console.error("Sync error:", e);
         } finally {
@@ -160,14 +130,11 @@ export async function setupPOSLogic(router) {
         }
     }
 
-    // --- CARGA Y REALTIME ---
     async function loadInitialData() {
         try {
-            // 1. Cargar Productos
             productosGlobal = await db.products.toArray();
             renderGrid(productosGlobal);
 
-            // 2. Cargar Datos del Negocio
             if (businessId && navigator.onLine) {
                 const { data: bData } = await supabase.from('businesses').select('*').eq('id', businessId).single();
                 if (bData) {
@@ -176,21 +143,20 @@ export async function setupPOSLogic(router) {
                         name: bData.name || 'Mi Negocio',
                         address: bData.address || '',
                         phone: bData.phone || '',
-                        logo_url: bData.logo_url || '',        // Leemos logo
+                        logo_url: bData.logo_url || '',        
                         ticket_footer: bData.ticket_footer || ''
                     };
                 }
             }
-
-            // 3. Sincronizar si hay red
             if (navigator.onLine) await safeSync();
-
         } catch (error) { console.error("Error cargando datos iniciales:", error); }
     }
     loadInitialData();
 
+    // --- FIX 2: Limpieza antes de suscribirse para evitar clones de memoria ---
     if (businessId) {
-        supabase.channel('realtime-products-pos')
+        if(realtimeProductsChannel) supabase.removeChannel(realtimeProductsChannel);
+        realtimeProductsChannel = supabase.channel('realtime-products-pos')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `business_id=eq.${businessId}` }, 
                 async (payload) => {
                     if (payload.eventType === 'DELETE') {
@@ -204,7 +170,7 @@ export async function setupPOSLogic(router) {
                         if (idx >= 0) productosGlobal[idx] = newProd; 
                         else productosGlobal.push(newProd);
                         
-                        const currentSearch = searchInput.value.toLowerCase();
+                        const currentSearch = searchInput ? searchInput.value.toLowerCase() : '';
                         if (!currentSearch || newProd.name.toLowerCase().includes(currentSearch)) {
                             renderGrid(productosGlobal);
                         }
@@ -213,7 +179,6 @@ export async function setupPOSLogic(router) {
             ).subscribe();
     }
 
-    // --- UI HELPERS ---
     document.getElementById('pos-theme-toggle').addEventListener('click', () => ThemeService.toggle());
     
     function initAudio() {
@@ -221,6 +186,7 @@ export async function setupPOSLogic(router) {
         try { audioContext = new (window.AudioContext || window.webkitAudioContext)(); const osc = audioContext.createOscillator(); osc.connect(audioContext.destination); osc.start(); osc.stop(audioContext.currentTime + 0.001); } catch(e) {}
     }
     document.addEventListener('click', initAudio, { once: true });
+    
     function playSound() {
         if (!audioContext) initAudio();
         try { const osc = audioContext.createOscillator(); const gain = audioContext.createGain(); osc.connect(gain); gain.connect(audioContext.destination); osc.type = 'sine'; osc.frequency.setValueAtTime(500, audioContext.currentTime); osc.frequency.linearRampToValueAtTime(1000, audioContext.currentTime + 0.1); osc.start(); gain.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5); osc.stop(audioContext.currentTime + 0.5); } catch(e) {}
@@ -250,9 +216,12 @@ export async function setupPOSLogic(router) {
         toast.onclick = () => { toast.style.display = 'none'; openWebOrdersModal(); };
         setTimeout(() => { toast.style.display = 'none'; }, 8000);
     }
+    
     if (businessId) {
-        supabase.channel('pos-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'web_orders', filter: `business_id=eq.${businessId}` }, (payload) => { showToast(payload.new.customer_name || "Cliente Web"); checkPendingOrders(); }).subscribe();
+        if (realtimeOrdersChannel) supabase.removeChannel(realtimeOrdersChannel);
+        realtimeOrdersChannel = supabase.channel('pos-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'web_orders', filter: `business_id=eq.${businessId}` }, (payload) => { showToast(payload.new.customer_name || "Cliente Web"); checkPendingOrders(); }).subscribe();
     }
+    
     if (ordersCheckInterval) clearInterval(ordersCheckInterval);
     ordersCheckInterval = setInterval(checkPendingOrders, 15000); 
     checkPendingOrders();
@@ -320,97 +289,104 @@ export async function setupPOSLogic(router) {
         modal.style.display = 'flex';
         modalContent.innerHTML = `<h2 style="color:var(--text-secondary);margin:0">Cobro Pedido Web</h2><div style="font-size:2.5rem;font-weight:800;color:var(--text-primary);margin-bottom:20px">$${order.total.toFixed(2)}</div><input type="number" id="web-input-received" class="pay-input-giant" placeholder="Recibido" autofocus style="background:transparent; color:var(--text-primary); border-bottom:2px solid var(--border-color);"><div style="background:var(--bg-input);padding:15px;border-radius:12px;margin-bottom:20px"><span style="color:var(--text-secondary)">Cambio:</span><strong id="web-change-label" style="font-size:1.5rem;display:block;color:var(--text-primary);">$0.00</strong></div><div style="display:flex;gap:10px"><button id="btn-cancel-web" style="flex:1;padding:15px;border:none;background:var(--bg-input);color:var(--text-primary);border-radius:12px;cursor:pointer">Cancelar</button><button id="btn-confirm-web" style="flex:2;padding:15px;border:none;background:var(--success-bg);color:white;font-weight:bold;border-radius:12px;cursor:pointer;opacity:0.5" disabled>FINALIZAR</button></div>`;
         const input = document.getElementById('web-input-received'), change = document.getElementById('web-change-label'), btn = document.getElementById('btn-confirm-web');
-        input.focus(); input.addEventListener('input', e => { const val = parseFloat(e.target.value)||0; const diff=val-order.total; change.textContent=`$${diff.toFixed(2)}`; if(diff>=0){change.style.color='var(--success-bg)';btn.disabled=false;btn.style.opacity="1";}else{change.style.color='var(--danger-color)';btn.disabled=true;btn.style.opacity="0.5";} });
+        input.focus(); 
+        
+        input.addEventListener('input', e => { 
+            const val = parseFloat(e.target.value)||0; 
+            const diff=val-order.total; 
+            change.textContent=`$${diff.toFixed(2)}`; 
+            if(diff>=0){change.style.color='var(--success-bg)';btn.disabled=false;btn.style.opacity="1";}
+            else{change.style.color='var(--danger-color)';btn.disabled=true;btn.style.opacity="0.5";} 
+        });
+
+        // --- FIX 1: SOPORTE PARA ENTER ---
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !btn.disabled) {
+                saveWebSale(order, parseFloat(input.value), parseFloat(input.value)-order.total);
+            }
+        });
+
         btn.addEventListener('click', () => saveWebSale(order, parseFloat(input.value), parseFloat(input.value)-order.total));
         document.getElementById('btn-cancel-web').addEventListener('click', () => openWebOrdersModal());
     }
 
     async function saveWebSale(order, received, change) {
         const btnConfirm = document.getElementById('btn-confirm-web');
-    if(btnConfirm) { btnConfirm.disabled = true; btnConfirm.textContent = "Procesando..."; }
+        if(btnConfirm) { btnConfirm.disabled = true; btnConfirm.textContent = "Procesando..."; }
 
-    try {
-        const { data: authData } = await supabase.auth.getUser();
-        
-        // Normalizamos items para que SQL los entienda
-        const itemsNormalizados = order.items.filter(i => i.type !== 'meta').map(i => ({ 
-            id: i.id,
-            name: i.name,
-            price: i.price,
-            cantidad: Number(i.qty || i.cantidad || 1), 
-            unit: i.unit || 'pz' 
-        }));
+        try {
+            const { data: authData } = await supabase.auth.getUser();
+            
+            const itemsNormalizados = order.items.filter(i => i.type !== 'meta').map(i => ({ 
+                id: i.id, name: i.name, price: i.price,
+                cantidad: Number(i.qty || i.cantidad || 1), unit: i.unit || 'pz' 
+            }));
 
-        const ventaUid = uuidv4(); // Generamos ID único
+            const ventaUid = uuidv4(); 
 
-        const paymentData = { 
-            method: "Web/Pickup", 
-            customer: order.customer_name, 
-            received: received, 
-            change: change 
-        };
+            const paymentData = { method: "Web/Pickup", customer: order.customer_name, received: received, change: change };
 
-        // LLAMADA A SQL: Registra la venta y marca entregado, PERO NO TOCA EL STOCK
-        // (El stock ya se restó cuando se creó el pedido en shop.js)
-        const { data: rpcData, error: rpcError } = await supabase.rpc('procesar_pedido_web', {
-            // CORRECCIÓN AQUÍ: Usamos localStorage en vez de db.businesses
-            p_business_id: datosNegocio.id || localStorage.getItem('archsell_business_id'),
-            p_web_order_id: order.id,
-            p_sale_id: ventaUid,
-            p_user_id: authData.user.id,
-            p_total: order.total,
-            p_items: itemsNormalizados,
-            p_payment_data: paymentData
-        });
+            const { data: rpcData, error: rpcError } = await supabase.rpc('procesar_pedido_web', {
+                p_business_id: datosNegocio.id || localStorage.getItem('archsell_business_id'),
+                p_web_order_id: order.id,
+                p_sale_id: ventaUid,
+                p_user_id: authData.user.id,
+                p_total: order.total,
+                p_items: itemsNormalizados,
+                p_payment_data: paymentData
+            });
 
-        if (rpcError) throw rpcError;
-        if (!rpcData.success) throw new Error(rpcData.message);
+            if (rpcError) throw rpcError;
+            if (!rpcData.success) throw new Error(rpcData.message);
 
-        // Éxito: Limpiamos UI e imprimimos
-        checkPendingOrders();
-        mostrarTicket({ 
-            uuid: ventaUid, 
-            date: new Date(), 
-            total: order.total, 
-            items: itemsNormalizados, 
-            payment: paymentData 
-        });
+            checkPendingOrders();
+            mostrarTicket({ uuid: ventaUid, date: new Date(), total: order.total, items: itemsNormalizados, payment: paymentData });
 
-    } catch (error) {
-        console.error(error);
-        alert("Error: " + error.message);
-        if(btnConfirm) { btnConfirm.disabled = false; btnConfirm.textContent = "FINALIZAR"; }
-    }
+        } catch (error) {
+            console.error(error); alert("Error: " + error.message);
+            if(btnConfirm) { btnConfirm.disabled = false; btnConfirm.textContent = "FINALIZAR"; }
+        }
     }
 
     syncService.listenConnection(async (isOnline) => {
         if(isOnline) { 
             statusBadge.innerHTML = `📶 Conectado`; statusBadge.style.backgroundColor = "#dcfce7"; statusBadge.style.color = "#166534"; 
-            await safeSync(); // Usar la función segura
+            await safeSync();
         } 
         else { statusBadge.innerHTML = `📡 Desconectado`; statusBadge.style.backgroundColor = "#fee2e2"; statusBadge.style.color = "#991b1b"; }
     });
     
     document.getElementById('btn-sync').addEventListener('click', async () => { 
         const btn = document.getElementById('btn-sync'); 
-        btn.innerHTML = "⏳"; 
-        await safeSync(); 
-        btn.innerHTML = "🔄"; 
+        btn.innerHTML = "⏳"; await safeSync(); btn.innerHTML = "🔄"; 
     });
     
-    document.getElementById('logout-btn').addEventListener('click', async () => { if(ordersCheckInterval) clearInterval(ordersCheckInterval); supabase.removeAllChannels(); await supabase.auth.signOut(); router.navigate('/'); });
+    document.getElementById('logout-btn').addEventListener('click', async () => { 
+        if(ordersCheckInterval) clearInterval(ordersCheckInterval); 
+        supabase.removeAllChannels(); 
+        await supabase.auth.signOut(); 
+        router.navigate('/'); 
+    });
 
-    // --- EVENTOS VISTA ---
     document.getElementById('btn-view-list').addEventListener('click', () => { container.className = 'products-grid list-mode'; document.getElementById('btn-view-list').classList.add('active'); document.getElementById('btn-view-grid').classList.remove('active'); });
     document.getElementById('btn-view-grid').addEventListener('click', () => { container.className = 'products-grid grid-mode'; document.getElementById('btn-view-grid').classList.add('active'); document.getElementById('btn-view-list').classList.remove('active'); });
 
-    // --- BUSQUEDA ---
+    // --- FIX 3: PREVENIR CLICS FANTASMA REPETIDOS QUE QUITAN EL FOCO ---
     searchInput.focus();
-    document.addEventListener('click', (e) => { if(modal.style.display !== 'flex' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') searchInput.focus(); });
+    if (!isDocumentListenerAdded) {
+        document.addEventListener('click', (e) => { 
+            const currentModal = document.getElementById('payment-modal');
+            const currentSearch = document.getElementById('search');
+            if(currentModal && currentSearch && currentModal.style.display !== 'flex' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+                currentSearch.focus(); 
+            }
+        });
+        isDocumentListenerAdded = true;
+    }
+
     searchInput.addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); renderGrid(productosGlobal.filter(p => p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q)))); });
     searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { const q = searchInput.value.trim().toLowerCase(); if (!q) return; const p = productosGlobal.find(p => (p.sku && p.sku.toLowerCase() === q) || p.name.toLowerCase() === q); if (p) { p.stock > 0 || p.is_bulk ? (addToCart(p), searchInput.value='') : (alert("Agotado"), searchInput.value=''); } else { alert("No encontrado"); searchInput.value=''; } } });
 
-    // --- RENDER GRID ---
     function renderGrid(products) {
         container.innerHTML = '';
         if(products.length === 0) { container.innerHTML = `<div style="text-align:center; padding:20px; width:100%; color:var(--text-secondary);">No hay productos. Sincroniza 🔄</div>`; return; }
@@ -439,7 +415,6 @@ export async function setupPOSLogic(router) {
         });
     }
 
-    // --- CARRITO ---
     function addToCart(p) {
         let qty = 1;
         if (p.is_bulk) { let val = prompt(`Granel: ${p.name}\nStock: ${p.stock}\n¿Cantidad?`, "1"); if(val===null) return; qty = parseFloat(val.replace(',','.')); if(isNaN(qty) || qty<=0) return alert("Inválido"); }
@@ -448,8 +423,24 @@ export async function setupPOSLogic(router) {
         if(ex) { ex.cantidad += qty; ex.cantidad = Math.round(ex.cantidad*1000)/1000; } else carrito.push({...p, cantidad: qty});
         renderCart();
     }
-    function updateCartItemQty(index, newQty) { const item = carrito[index]; if(newQty <= 0) { if(confirm("¿Quitar?")) carrito.splice(index, 1); } else { if(!item.is_bulk && newQty > item.stock) { alert(`Stock máximo: ${item.stock}`); carrito[index].cantidad = item.stock; } else { carrito[index].cantidad = newQty; } } renderCart(); }
+    
+    // --- FIX 4: Protección anti NaN en cantidades vacías ---
+    function updateCartItemQty(index, newQty) { 
+        const item = carrito[index]; 
+        if(isNaN(newQty) || newQty <= 0) { 
+            if(confirm("¿Quitar?")) carrito.splice(index, 1); 
+        } else { 
+            if(!item.is_bulk && newQty > item.stock) { 
+                alert(`Stock máximo: ${item.stock}`); carrito[index].cantidad = item.stock; 
+            } else { 
+                carrito[index].cantidad = newQty; 
+            } 
+        } 
+        renderCart(); 
+    }
+    
     function removeFromCart(idx) { carrito.splice(idx, 1); renderCart(); }
+    
     function renderCart() {
         cartItemsContainer.innerHTML = ''; totalVenta = 0;
         if(carrito.length===0) { cartItemsContainer.innerHTML = `<div style="text-align:center;color:var(--text-secondary);margin-top:50px"><div style="font-size:3rem">🛒</div><p>Vacío</p></div>`; cartTotalLabel.textContent='$0.00'; return; }
@@ -484,12 +475,26 @@ export async function setupPOSLogic(router) {
             </div>`;
         const input = document.getElementById('input-received'), change = document.getElementById('change-label'), btn = document.getElementById('btn-confirm-pay');
         input.focus();
-        input.addEventListener('input', e => { const val = parseFloat(e.target.value) || 0; const c = val - totalVenta; change.textContent = `$${c.toFixed(2)}`; if(c>=0) { change.style.color='var(--success-bg)'; btn.disabled=false; btn.style.opacity="1"; } else { change.style.color='var(--danger-color)'; btn.disabled=true; btn.style.opacity="0.5"; } });
+        
+        input.addEventListener('input', e => { 
+            const val = parseFloat(e.target.value) || 0; 
+            const c = val - totalVenta; 
+            change.textContent = `$${c.toFixed(2)}`; 
+            if(c>=0) { change.style.color='var(--success-bg)'; btn.disabled=false; btn.style.opacity="1"; } 
+            else { change.style.color='var(--danger-color)'; btn.disabled=true; btn.style.opacity="0.5"; } 
+        });
+
+        // --- FIX 1: SOPORTE PARA ENTER EN PUNTO DE VENTA NORMAL ---
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !btn.disabled) {
+                procesarVenta(parseFloat(input.value), btn);
+            }
+        });
+
         btn.addEventListener('click', () => procesarVenta(parseFloat(input.value), btn));
         document.getElementById('btn-cancel-modal').addEventListener('click', () => { modal.style.display = 'none'; searchInput.focus(); });
     }
 
-    // --- PROCESAMIENTO DE VENTA (Con Idempotencia Fix) ---
     async function procesarVenta(recibido, btnElement) {
         if (!businessId) { alert("Error: ID negocio no encontrado. Recargue."); return; }
         
@@ -501,13 +506,11 @@ export async function setupPOSLogic(router) {
             const totalFinal = totalVenta;
             const ventaUid = uuidv4(); 
 
-            // FIX DUPLICACIÓN: Añadido "id: ventaUid" para asegurar idempotencia al sincronizar.
-            // Si el servicio de sync sube esto 2 veces, Supabase rechazará/ignorará la segunda porque el ID ya existe.
-            const venta = { 
-                id: ventaUid, // <--- ESTA LINEA ES LA CLAVE DE LA CORRECCION
-                uuid: ventaUid, 
-                date: new Date(), 
-                total: totalFinal, 
+            const venta = {
+                id: ventaUid,
+                uuid: ventaUid,
+                date: new Date(),
+                total: totalFinal,
                 items: itemsTicket, 
                 items_rpc: itemsForRpc, 
                 payment: { method: 'cash', received: recibido, change: recibido - totalFinal }, 
@@ -527,7 +530,6 @@ export async function setupPOSLogic(router) {
             carrito=[]; renderCart(); mostrarTicket(venta); 
 
             if(navigator.onLine) {
-                // Usamos safeSync en lugar de llamar directo al servicio para evitar colisiones
                 safeSync()
                     .then(() => console.log("Sincronización post-venta exitosa"))
                     .catch(err => console.warn("Sincronización pendiente:", err));
@@ -540,127 +542,113 @@ export async function setupPOSLogic(router) {
         }
     }
 
-    // --- CORRECCIÓN VISUAL DEL TICKET ---
+    // --- CORRECCIÓN VISUAL DEL TICKET Y DE IMPRESIÓN ---
+    // --- CORRECCIÓN VISUAL DEL TICKET Y DE IMPRESIÓN ---
     function mostrarTicket(venta) {
-    const s = datosNegocio;
+        const s = datosNegocio || {};
+        
+        // 1. Protegemos las variables. Buscamos el ID donde esté, y el footer sin importar cómo lo devuelva Supabase
+        const ticketId = venta.uuid || venta.id || Math.floor(Math.random() * 100000000).toString();
+        const customFooter = s.ticket_footer || s.footer || s.ticket_message || ''; 
+        
+        // 2. Creamos un ID único para el código de barras, así JsBarcode nunca se confunde
+        const barcodeId = "barcode-" + Date.now(); 
 
         const styleInjection = `
             <style>
                 .ticket-container {
-                color: var(--text-primary);
-                background: var(--bg-card);
+                    color: #000;
+                    background: #fff;
+                    width: 100%;
+                    font-family: 'Courier New', Courier, monospace;
+                    padding: 0;
+                    box-sizing: border-box;
+                    font-size: 12px; /* Letra base más pequeña */
                 }  
 
-                @media print {
-                .ticket-container {
-                    color: #000 !important;
-                    background: #fff !important;
-                }
-                }
-                
                 /* HEADER: Logo Izquierda - Info Derecha */
-                .ticket-header-flex {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-bottom: 6px;
-                border-bottom: 1px dashed #000;
-                padding-bottom: 6px;
-                }
-
-                .ticket-logo-img {
-                    width: 40px;
-                    height: auto;
-                    flex-shrink: 0;
-                }
-
-                .ticket-info-col {
-                    text-align: right;
-                    flex-grow: 1;
-                    font-size: 11px;
-                    line-height: 1.3;
-                }
-
-                .ticket-store-name {
-                    font-weight: bold;
-                    font-size: 13px;
-                }
-                /* TABLA ITEMS */
-                .dashed-line { border-top: 1px dashed #000; margin: 5px 0; }
-                .items-header { display: flex; font-weight: bold; font-size: 0.8rem; margin-bottom: 5px; }
-                .items-header span:nth-child(1) { width: 30px; } 
-                .items-header span:nth-child(2) { flex: 1; }
-                .items-header span:nth-child(3) { width: 60px; text-align: right; }
+                .ticket-header-flex { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
+                .ticket-logo-img { width: 40px; height: auto; flex-shrink: 0; }
+                .ticket-info-col { text-align: right; flex-grow: 1; font-size: 11px; line-height: 1.3; }
+                .ticket-store-name { font-weight: bold; font-size: 13px; text-transform: uppercase; }
                 
-                .ticket-item-row { display: flex; font-size: 0.85rem; margin-bottom: 3px; }
-                .t-qty { width: 30px; }
-                .t-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                .t-price { width: 60px; text-align: right; }
+                /* TABLA ITEMS (Forzando separación con porcentajes) */
+                .dashed-line { border-top: 1px dashed #000; margin: 6px 0; }
+                
+                .items-header { display: flex; font-weight: bold; font-size: 11px; margin-bottom: 4px; width: 100%; }
+                .items-header span:nth-child(1) { width: 15%; text-align: left; } 
+                .items-header span:nth-child(2) { width: 55%; text-align: left; padding: 0 5px; }
+                .items-header span:nth-child(3) { width: 30%; text-align: right; }
+                
+                .ticket-item-row { display: flex; font-size: 11px; margin-bottom: 4px; align-items: flex-start; width: 100%; }
+                .t-qty { width: 15%; font-weight: bold; text-align: left; }
+                .t-name { width: 55%; white-space: normal; word-break: break-word; padding: 0 5px; line-height: 1.1; text-align: left; }
+                .t-price { width: 30%; text-align: right; }
 
                 /* TOTALES */
-                .ticket-totals { margin-top: 10px; text-align: right; }
-                .total-row { display: flex; justify-content: space-between; font-size: 0.9rem; }
-                .total-row.big { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
+                /* TOTALES */
+                .ticket-totals { margin-top: 8px; text-align: right; width: 100%; margin-bottom: 0; padding-bottom: 0; }
+                .total-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+                .total-row.big { font-weight: bold; font-size: 16px; margin-bottom: 6px; border-top: 1px solid #000; padding-top: 4px;}
 
-                /* --- FOOTER CENTRADO (CORREGIDO) --- */
-                .footer-centered-container {
-                    margin-top: 20px;
-                    text-align: center !important; /* Fuerza centrado de texto */
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center; /* Centra elementos bloque */
-                    width: 100%;
-                }
+                /* FOOTER Y CÓDIGO DE BARRAS (Espaciado Optimizado) */
+                .footer-centered-container { margin-top: 2px; text-align: center; display: flex; flex-direction: column; align-items: center; width: 100%; }
+                .footer-text { font-size: 11px; margin: 2px 0; width: 100%; text-align: center; }
                 
-                /* Textos de despedida */
-                .footer-text {
-                    font-size: 0.85rem;
-                    margin: 2px 0;
-                    width: 100%;
-                    text-align: center;
-                }
+                .barcode-wrapper { margin: 2px 0; width: 100%; display: flex; justify-content: center; }
+                .barcode-wrapper svg { max-width: 90%; height: 35px; }
 
-                /* Caja de Leyenda (Admin) */
-                .ticket-legend-box {
+                .ticket-legend-box { 
                     margin-top: 10px; 
-                    padding-top: 10px;
-                    border-top: 1px dashed #000;
-                    width: 100%;
-                    text-align: center !important; /* Centrado forzoso */
-                    font-size: 0.8rem; 
-                    font-weight: bold;
+                    padding-top: 8px; 
+                    border-top: 1px dashed #000; 
+                    width: 100%; 
+                    text-align: center; 
+                    font-size: 10px; 
                     white-space: pre-wrap; 
-                    padding-bottom: 30px;
+                    word-break: break-word;
                 }
 
-                /* Código de Barras */
-                #barcode {
-                    width: 100%;
-                    max-width: 1800px;
-                    height: 40px;
-                    margin: 8px auto; /* Auto margin centra bloques */
-                    display: block;
-                }
-                
+                /* 🖨️ MAGIA DE IMPRESIÓN 🖨️ */
                 @media print {
-                    .ticket-scroll-area { overflow: visible !important; max-height: none !important; border: none; }
-                    .modal-card { box-shadow: none; border: none; padding: 0; }
-                    .no-print { display: none !important; }
-                }
-                    .ticket-end-space {
-                    height: 40px;
+                    @page { margin: 0; }
+                    /* Ocultamos interfaz */
+                    .catalog-panel, .cart-panel, .no-print, #toast-notification { display: none !important; }
+                    
+                    /* Liberamos contenedores para permitir el crecimiento hacia abajo */
+                    html, body, .pos-layout, .modal-overlay, .modal-card, #modal-content {
+                        position: static !important; display: block !important; height: auto !important;
+                        overflow: visible !important; background: #fff !important; margin: 0 !important;
+                        padding: 0 !important; border: none !important; box-shadow: none !important;
                     }
+
+                    /* Configuramos el ticket */
+                    #printable-area {
+                        position: static !important;
+                        width: 100% !important;
+                        max-width: 80mm !important; /* Si usas de 58mm, cámbialo a 58mm */
+                        margin: 0 auto !important;
+                        padding: 0 5mm 10mm 5mm !important; /* El 10mm final asegura espacio para el corte */
+                        box-sizing: border-box !important;
+                        background: #fff !important;
+                        color: #000 !important;
+                    }
+
+                    /* Forzamos que las columnas se respeten en impresión */
+                    .items-header, .ticket-item-row { display: flex !important; }
+                    
+                    .ticket-scroll-area { height: auto !important; overflow: visible !important; max-height: none !important; }
+                }
             </style>
         `;
 
-        // Preparamos HTMLs
         const logoHtml = s.logo_url 
             ? `<img src="${s.logo_url}" class="ticket-logo-img" alt="Logo" onerror="this.style.display='none'">` 
             : '';
 
-        const footerHtml = s.ticket_footer 
-            ? `<div class="ticket-legend-box">${s.ticket_footer}</div>` 
-            : '<div style="padding-bottom:20px;"></div>';
+        const footerHtml = customFooter 
+            ? `<div class="ticket-legend-box">${customFooter}</div>` 
+            : '';
 
         modalContent.innerHTML = `
             ${styleInjection}
@@ -670,10 +658,10 @@ export async function setupPOSLogic(router) {
                     <div class="ticket-header-flex">
                         ${logoHtml}
                         <div class="ticket-info-col">
-                            <div class="ticket-store-name">${s.name}</div>
+                            <div class="ticket-store-name">${s.name || 'Mi Negocio'}</div>
                             ${s.address ? `<div>${s.address}</div>` : ''}
                             ${s.phone ? `<div>Tel: ${s.phone}</div>` : ''}
-                            <div style="margin-top:4px;">${new Date(venta.date).toLocaleString()}</div>
+                            <div style="margin-top:5px;">${new Date(venta.date || Date.now()).toLocaleString()}</div>
                         </div>
                     </div>
                     
@@ -681,7 +669,7 @@ export async function setupPOSLogic(router) {
                     <div class="dashed-line"></div>
                     
                     <div style="width:100%;">
-                        ${venta.items.map(i => `
+                        ${(venta.items || []).map(i => `
                             <div class="ticket-item-row">
                                 <div class="t-qty">${i.cantidad}</div>
                                 <div class="t-name">${i.name}</div>
@@ -692,14 +680,16 @@ export async function setupPOSLogic(router) {
                     
                     <div class="dashed-line"></div>
                     <div class="ticket-totals">
-                        <div class="total-row big"><span>TOTAL</span><span>$${venta.total.toFixed(2)}</span></div>
-                        <div class="total-row"><span>Efectivo:</span><span>$${venta.payment.received.toFixed(2)}</span></div>
-                        <div class="total-row"><span>Cambio:</span><span>$${venta.payment.change.toFixed(2)}</span></div>
+                        <div class="total-row big"><span>TOTAL</span><span>$${(venta.total || 0).toFixed(2)}</span></div>
+                        <div class="total-row"><span>Efectivo:</span><span>$${(venta.payment?.received || 0).toFixed(2)}</span></div>
+                        <div class="total-row"><span>Cambio:</span><span>$${(venta.payment?.change || 0).toFixed(2)}</span></div>
                     </div>
                     
                     <div class="footer-centered-container">
-                        <svg id="barcode"></svg>
-                        <div style="font-size: 0.7rem; text-align:center; margin-bottom:5px;">${venta.uuid}</div>
+                        <div class="barcode-wrapper">
+                            <svg id="${barcodeId}"></svg>
+                        </div>
+                        <div style="font-size: 0.7rem; text-align:center; margin-bottom:8px;">${ticketId}</div>
 
                         <div class="footer-text">¡GRACIAS POR SU COMPRA!</div>
                         <div class="footer-text">*** VUELVA PRONTO ***</div>
@@ -709,27 +699,34 @@ export async function setupPOSLogic(router) {
 
                 </div>
             </div>
-            <div class="no-print" style="flex-shrink: 0; margin-top:10px; display:flex; gap:10px; flex-direction:column;">
-                <button onclick="window.print()" class="pay-btn-large" style="padding:12px; font-size:1rem; background: var(--text-primary); color: var(--bg-card);">🖨️ Imprimir</button>
-                <button id="close-ticket" style="padding:12px; border:1px solid var(--border-color); background:transparent; color:var(--text-secondary); border-radius:12px; cursor:pointer; font-weight:bold;">Cerrar</button>
+            <div class="no-print" style="flex-shrink: 0; margin-top:15px; display:flex; gap:10px; flex-direction:column;">
+                <button onclick="window.print()" class="pay-btn-large" style="padding:15px; font-size:1.1rem; background: var(--text-primary); color: var(--bg-card); border-radius:8px; border:none; cursor:pointer;">🖨️ Imprimir Ticket</button>
+                <button id="close-ticket" style="padding:12px; border:1px solid var(--border-color); background:transparent; color:var(--text-secondary); border-radius:8px; cursor:pointer; font-weight:bold;">Cerrar</button>
             </div>
-            <div class="ticket-end-space"></div>
         `;
 
-        // Generar Código de Barras (con pequeño delay para asegurar renderizado)
+        // Pequeño retardo aumentado para asegurar que el DOM dibujó el <svg>
         setTimeout(() => {
             if (window.JsBarcode) {
-                JsBarcode("#barcode", venta.uuid, {
-                    format: "CODE128",
-                    width: 1.2,
-                    height: 32,
-                    displayValue: false,
-                    margin: 0
-                });
+                try {
+                    JsBarcode("#" + barcodeId, ticketId, {
+                        format: "CODE128",
+                        width: 1.2,
+                        height: 35,
+                        displayValue: false,
+                        margin: 0
+                    });
+                } catch(e) {
+                    console.error("Error al generar código de barras:", e);
+                }
             }
-        }, 100);
+        }, 150);
 
         const closeBtn = document.getElementById('close-ticket');
-        if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; document.getElementById('search').focus(); });
+        if(closeBtn) closeBtn.addEventListener('click', () => { 
+            modal.style.display = 'none'; 
+            const searchInput = document.getElementById('search');
+            if(searchInput) searchInput.focus(); 
+        });
     }
 }

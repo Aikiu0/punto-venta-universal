@@ -1,4 +1,4 @@
-// src/modules/admin/dashboard.js - CONTROL DE GRÁFICAS POR PLAN (MEJORADO V2)
+// src/modules/admin/dashboard.js - CONTROL DE GRÁFICAS POR PLAN (MEJORADO V2) + CONTABILIDAD EXACTA
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
 import { db } from '../../data/db-local.js';
@@ -8,11 +8,15 @@ import { renderSidebarHeader } from './components/sidebarHeader.js';
 
 let salesChartInstance = null;
 let topProductsChartInstance = null;
+const activeAnimations = {}; // Control para evitar solapamiento de animaciones
 
 // --- UTILS PARA ANIMACIONES ---
 function animateValue(id, start, end, duration, isCurrency = true) {
     const obj = document.getElementById(id);
     if (!obj) return;
+    
+    // Si hay una animación corriendo en este elemento, la cancelamos para que no choquen
+    if (activeAnimations[id]) cancelAnimationFrame(activeAnimations[id]);
     
     let startTimestamp = null;
     const step = (timestamp) => {
@@ -20,31 +24,21 @@ function animateValue(id, start, end, duration, isCurrency = true) {
         const progress = Math.min((timestamp - startTimestamp) / duration, 1);
         const value = Math.floor(progress * (end - start) + start);
         
-        // Formateo durante la animación
         if (isCurrency) {
             obj.innerHTML = new Intl.NumberFormat('es-MX', { 
-                style: 'currency', 
-                currency: 'MXN',
-                minimumFractionDigits: 2 
-            }).format(progress === 1 ? end : value); // Asegurar decimales exactos al final
+                style: 'currency', currency: 'MXN', minimumFractionDigits: 2 
+            }).format(progress === 1 ? end : value); 
         } else {
             obj.innerHTML = value;
         }
 
         if (progress < 1) {
-            window.requestAnimationFrame(step);
+            activeAnimations[id] = window.requestAnimationFrame(step);
         } else {
-             // Asegurar valor final exacto con decimales si es moneda
-            if (isCurrency) {
-                 obj.innerHTML = new Intl.NumberFormat('es-MX', { 
-                    style: 'currency', 
-                    currency: 'MXN',
-                    minimumFractionDigits: 2 
-                }).format(end);
-            }
+            delete activeAnimations[id];
         }
     };
-    window.requestAnimationFrame(step);
+    activeAnimations[id] = window.requestAnimationFrame(step);
 }
 
 export function renderDashboard() {
@@ -62,23 +56,14 @@ export function renderDashboard() {
         </div>
     `;
 
-    // Estilos inyectados para animaciones sin requerir CSS externo extra
     const dashboardStyles = `
         <style>
-            @keyframes fadeInUp {
-                from { opacity: 0; transform: translateY(20px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
+            @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
             .anim-stagger { opacity: 0; animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-            .delay-1 { animation-delay: 0.1s; }
-            .delay-2 { animation-delay: 0.2s; }
-            .delay-3 { animation-delay: 0.3s; }
-            .delay-4 { animation-delay: 0.4s; }
-            .delay-5 { animation-delay: 0.5s; }
-            
+            .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.2s; } .delay-3 { animation-delay: 0.3s; }
+            .delay-4 { animation-delay: 0.4s; } .delay-5 { animation-delay: 0.5s; }
             .card-panel { transition: transform 0.2s, box-shadow 0.2s; }
             .card-panel:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-            
             .kpi-value { background: linear-gradient(90deg, var(--text-primary), var(--text-secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         </style>
     `;
@@ -89,9 +74,7 @@ export function renderDashboard() {
             <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
             <aside class="admin-sidebar" id="admin-sidebar">
-                <div class="sidebar-logo">
-                    ${renderSidebarHeader()}
-                </div>
+                <div class="sidebar-logo">${renderSidebarHeader()}</div>
                 <nav class="sidebar-menu">
                     <button class="menu-item active"> Dashboard</button>
                     <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">${lockOrders} Pedidos Web</button>
@@ -118,7 +101,7 @@ export function renderDashboard() {
                         <button id="theme-toggle-dash" class="icon-btn" title="Tema">🌗</button>
                         <div style="text-align:right;">
                             <small style="color:var(--text-secondary);">Hoy</small>
-                            <div style="font-weight:bold; color:var(--text-primary);">${new Date().toLocaleDateString()}</div>
+                            <div style="font-weight:bold; color:var(--text-primary);">${new Date().toLocaleDateString('es-MX')}</div>
                         </div>
                     </div>
                 </header>
@@ -142,7 +125,6 @@ export function renderDashboard() {
                 </div>
                 
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
-                     
                      <div class="card-panel premium-blur-container anim-stagger delay-4">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                             <h3 style="color:var(--text-primary); margin:0;"> Rendimiento (7 Días)</h3>
@@ -178,7 +160,7 @@ export function renderDashboard() {
 
 export async function setupDashboardLogic(router) {
     Chart.defaults.color = '#94a3b8';
-    Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.5)'; // Más sutil
+    Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.5)';
     Chart.defaults.font.family = "'Montserrat', sans-serif";
     Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.9)';
     Chart.defaults.plugins.tooltip.padding = 10;
@@ -189,8 +171,6 @@ export async function setupDashboardLogic(router) {
     const overlay = document.getElementById('sidebar-overlay');
     const btnOpen = document.getElementById('mobile-menu-btn');
     const btnClose = document.getElementById('btn-close-sidebar');
-    
-    // Fix para botón cerrar en móvil
     if (window.innerWidth <= 768 && btnClose) btnClose.style.display = 'block';
 
     function toggleMenu(show) {
@@ -211,8 +191,6 @@ export async function setupDashboardLogic(router) {
     const btnSet = document.getElementById('nav-settings'); if (btnSet) btnSet.addEventListener('click', () => navigateTo('/admin/settings'));
     const btnSup = document.getElementById('nav-suppliers'); if (btnSup) btnSup.addEventListener('click', () => navigateTo('/admin/suppliers'));
     const logoutBtn = document.getElementById('nav-logout');
-    const btnBill = document.getElementById('nav-billing');
-    if (btnBill) btnBill.addEventListener('click', () => navigateTo('/admin/billing'));
     if (logoutBtn) logoutBtn.addEventListener('click', async () => { await supabase.auth.signOut(); navigateTo('/'); });
     const themeBtn = document.getElementById('theme-toggle-dash');
     if (themeBtn) themeBtn.addEventListener('click', () => ThemeService.toggle());
@@ -224,36 +202,27 @@ export async function setupDashboardLogic(router) {
         let localProducts = [];
         
         try {
-            // Estrategia de carga robusta
             if (businessId && db && db.sales && db.products) {
                 if(typeof db.sales.where === 'function') {
                     try {
                         localSales = await db.sales.where('business_id').equals(businessId).toArray();
                         localProducts = await db.products.where('business_id').equals(businessId).toArray();
                     } catch (e) {
-                         // Fallback si no hay índice
-                        const allS = await db.sales.toArray();
-                        const allP = await db.products.toArray();
-                        localSales = allS.filter(s => String(s.business_id) === String(businessId));
-                        localProducts = allP.filter(p => String(p.business_id) === String(businessId));
+                        localSales = (await db.sales.toArray()).filter(s => String(s.business_id) === String(businessId));
+                        localProducts = (await db.products.toArray()).filter(p => String(p.business_id) === String(businessId));
                     }
                 } else {
                     localSales = await db.sales.toArray();
                     localProducts = await db.products.toArray();
                 }
             }
-        } catch (err) {
-            console.error("Error DB local:", err);
-        }
+        } catch (err) { console.error("Error DB local:", err); }
 
         processAndRender(localSales, localProducts);
 
         if (navigator.onLine) {
             try {
-                // Sincronización silenciosa en background
                 await Promise.all([syncService.downloadSalesHistory(), syncService.downloadProducts()]);
-                
-                // Recarga post-sync
                 if (businessId && db && db.sales.where) {
                     try {
                         localSales = await db.sales.where('business_id').equals(businessId).toArray();
@@ -264,27 +233,33 @@ export async function setupDashboardLogic(router) {
                     }
                 }
                 processAndRender(localSales, localProducts);
-            } catch (err) {
-                console.warn("Sync background error:", err);
-            }
+            } catch (err) { console.warn("Sync background error:", err); }
         }
     }
 
-    async function processAndRender(sales, products) {
+    async function processAndRender(rawSales, products) {
+        // 🚨 FIX 1: DEDUPLICACIÓN DE VENTAS Y FILTRADO
+        // Evita que una venta local y su clon en la nube se sumen dos veces
+        const uniqueSalesMap = new Map();
+        (rawSales || []).forEach(s => {
+            if (s.status === 'cancelado') return; // Ignorar ventas canceladas
+            const key = s.uuid || s.id; // Priorizar UUID
+            uniqueSalesMap.set(key, s);
+        });
+        const sales = Array.from(uniqueSalesMap.values());
+
         const businessId = localStorage.getItem('archsell_business_id') || PermissionService.getBusinessId?.();
         let pendingOrders = 0;
 
-        // Solo buscar pedidos web si tiene el permiso, para ahorrar requests
         if (navigator.onLine && PermissionService.can('web_orders')) {
             try {
                 const query = supabase.from('web_orders').select('*', { count: 'exact', head: true }).eq('status', 'pendiente');
                 if (businessId) query.eq('business_id', businessId);
                 const { count } = await query;
                 pendingOrders = count || 0;
-            } catch (err) { console.warn(err); }
+            } catch (err) {}
         }
 
-        // Renderizado visual
         calculateKPIs(sales, products, pendingOrders);
 
         if (PermissionService.can('history')) {
@@ -299,13 +274,12 @@ export async function setupDashboardLogic(router) {
     }
 
     function calculateKPIs(sales, products, pendingOrders) {
-        const today = new Date().toDateString();
+        const todayStr = new Date().toDateString();
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         
         let todaySales = 0, monthSales = 0, todayProfit = 0;
 
-        // Optimización: Crear mapa de costos una sola vez
         const costMap = new Map();
         (products || []).forEach(p => {
             const cost = Number(p.cost_price);
@@ -317,37 +291,29 @@ export async function setupDashboardLogic(router) {
 
         (sales || []).forEach(s => {
             const d = new Date(s.date || s.created_at || s.createdAt);
-            // Validación de fecha inválida
             if(isNaN(d.getTime())) return;
 
-            const isToday = d.toDateString() === today;
+            const isToday = d.toDateString() === todayStr;
             const isThisMonth = d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-            
             const totalVenta = Number(s.total || 0);
 
             if (isToday) todaySales += totalVenta;
             if (isThisMonth) monthSales += totalVenta;
 
-            // MATEMÁTICAS DE GANANCIA (Revisado)
             if (isToday && s.items && Array.isArray(s.items)) {
                 let saleTotalCost = 0;
                 
                 s.items.forEach(item => {
-                    if (item.type === 'meta') return; // Ignorar notas o metadatos
+                    if (item.type === 'meta') return; 
                     
                     const qty = Number(item.cantidad || item.qty || item.quantity || 0);
                     let unitCost = 0;
 
-                    // 1. Prioridad: Costo histórico grabado en el momento de la venta
                     if (item.historical_cost !== undefined && item.historical_cost !== null) {
                         unitCost = Number(item.historical_cost);
-                    } 
-                    // 2. Fallback: Costo actual en catálogo (por ID)
-                    else if (item.id && costMap.has(String(item.id))) {
+                    } else if (item.id && costMap.has(String(item.id))) {
                         unitCost = costMap.get(String(item.id));
-                    } 
-                    // 3. Fallback final: Costo actual por Nombre
-                    else {
+                    } else {
                         unitCost = costMap.get(`name:${item.name}`) || 0;
                     }
 
@@ -355,30 +321,20 @@ export async function setupDashboardLogic(router) {
                     saleTotalCost += (unitCost * qty);
                 });
 
-                // Ganancia Bruta = Venta Total - Costo de lo Vendido
                 todayProfit += (totalVenta - saleTotalCost);
             }
         });
 
-        // Usar animación de conteo
         animateValue("kpi-today", 0, todaySales, 1500);
         animateValue("kpi-profit", 0, todayProfit, 1500);
         animateValue("kpi-month", 0, monthSales, 1500);
-        
-        // Pedidos no es moneda, pasar false
-        const elOrders = document.getElementById('kpi-orders'); // Asegúrate que este ID exista en tu HTML o Sidebar
-        // Nota: en tu HTML original no estaba el KPI de orders en cards, pero si lo agregas, usa esto:
-        if (elOrders) elOrders.textContent = pendingOrders;
     }
 
     function renderSalesChart(sales, products) {
         const canvas = document.getElementById('salesChart');
         if (!canvas) return;
 
-        if (salesChartInstance) {
-            salesChartInstance.destroy();
-            salesChartInstance = null;
-        }
+        if (salesChartInstance) { salesChartInstance.destroy(); salesChartInstance = null; }
 
         const costMap = new Map();
         (products || []).forEach(p => {
@@ -389,26 +345,27 @@ export async function setupDashboardLogic(router) {
             }
         });
 
-        const last7DaysSales = {};
-        const last7DaysCosts = {};
-        const labelsMap = [];
-
+        // 🚨 FIX 2: COLISIONES DE FECHAS EN LA GRÁFICA
+        // Se utiliza la fecha exacta (toDateString) como llave oculta, y se muestra el nombre corto
+        const last7DaysData = {};
+        const labelsMapKeys = [];
+        
         for (let i = 6; i >= 0; i--) {
             const d = new Date(); 
             d.setDate(d.getDate() - i);
-            const key = d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
-            last7DaysSales[key] = 0;
-            last7DaysCosts[key] = 0;
-            labelsMap.push(key);
+            const exactDate = d.toDateString(); 
+            const shortLabel = d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
+            
+            last7DaysData[exactDate] = { label: shortLabel, sales: 0, costs: 0 };
+            labelsMapKeys.push(exactDate);
         }
 
         (sales || []).forEach(s => {
             const d = new Date(s.date || s.created_at || s.createdAt);
             if(isNaN(d.getTime())) return;
-            
-            const dateKey = d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
+            const exactDate = d.toDateString();
 
-            if (last7DaysSales.hasOwnProperty(dateKey)) {
+            if (last7DaysData[exactDate]) {
                 const totalVenta = Number(s.total || 0);
                 let totalCosto = 0;
 
@@ -418,88 +375,37 @@ export async function setupDashboardLogic(router) {
                         const qty = Number(item.cantidad || item.qty || item.quantity || 0);
                         let unitCost = item.historical_cost !== undefined ? Number(item.historical_cost) : 
                                       (costMap.get(String(item.id)) || costMap.get(item.name) || 0);
-                        
                         totalCosto += (qty * unitCost);
                     });
                 }
                 
-                last7DaysSales[dateKey] += totalVenta;
-                last7DaysCosts[dateKey] += totalCosto;
+                last7DaysData[exactDate].sales += totalVenta;
+                last7DaysData[exactDate].costs += totalCosto;
             }
         });
 
         const ctx = canvas.getContext('2d');
-        
-        // Gradientes para "Look" Caro
         const gradientSales = ctx.createLinearGradient(0, 0, 0, 400);
-        gradientSales.addColorStop(0, 'rgba(59, 130, 246, 0.5)'); // Azul
-        gradientSales.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
-
+        gradientSales.addColorStop(0, 'rgba(59, 130, 246, 0.5)'); gradientSales.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
         const gradientCosts = ctx.createLinearGradient(0, 0, 0, 400);
-        gradientCosts.addColorStop(0, 'rgba(239, 68, 68, 0.3)'); // Rojo
-        gradientCosts.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+        gradientCosts.addColorStop(0, 'rgba(239, 68, 68, 0.3)'); gradientCosts.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
 
         salesChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: labelsMap,
+                labels: labelsMapKeys.map(k => last7DaysData[k].label),
                 datasets: [
-                    { 
-                        label: 'Ventas', 
-                        data: labelsMap.map(k => last7DaysSales[k]), 
-                        borderColor: '#3b82f6',
-                        backgroundColor: gradientSales,
-                        borderWidth: 3,
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: '#3b82f6',
-                        pointHoverRadius: 6,
-                        tension: 0.4, // Curva suave (bezier)
-                        fill: true 
-                    },
-                    { 
-                        label: 'Costos', 
-                        data: labelsMap.map(k => last7DaysCosts[k]), 
-                        borderColor: '#ef4444',
-                        backgroundColor: gradientCosts,
-                        borderWidth: 2,
-                        pointBackgroundColor: '#fff',
-                        borderDash: [5, 5], // Línea punteada para costos (estándar financiero)
-                        tension: 0.4, 
-                        fill: true 
-                    }
+                    { label: 'Ventas', data: labelsMapKeys.map(k => last7DaysData[k].sales), borderColor: '#3b82f6', backgroundColor: gradientSales, borderWidth: 3, pointBackgroundColor: '#fff', pointHoverRadius: 6, tension: 0.4, fill: true },
+                    { label: 'Costos', data: labelsMapKeys.map(k => last7DaysData[k].costs), borderColor: '#ef4444', backgroundColor: gradientCosts, borderWidth: 2, pointBackgroundColor: '#fff', borderDash: [5, 5], tension: 0.4, fill: true }
                 ]
             },
             options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                interaction: { mode: 'index', intersect: false },
-                animation: {
-                    duration: 2000,
-                    easing: 'easeOutQuart'
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: 'rgba(148, 163, 184, 0.1)' }
-                    },
-                    x: {
-                        grid: { display: false }
-                    }
-                },
+                responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                animation: { duration: 2000, easing: 'easeOutQuart' },
+                scales: { y: { beginAtZero: true, grid: { color: 'rgba(148, 163, 184, 0.1)' } }, x: { grid: { display: false } } },
                 plugins: { 
                     legend: { position: 'top', align: 'end' },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) { label += ': '; }
-                                if (context.parsed.y !== null) {
-                                    label += new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(context.parsed.y);
-                                }
-                                return label;
-                            }
-                        }
-                    }
+                    tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.y !== null) { label += new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(context.parsed.y); } return label; } } }
                 } 
             }
         });
@@ -507,25 +413,19 @@ export async function setupDashboardLogic(router) {
 
     function renderTopProducts(sales, products) {
         if (topProductsChartInstance) { topProductsChartInstance.destroy(); topProductsChartInstance = null; }
-
         const isAdvanced = PermissionService.can('history');
         const countsById = {};
         const nameById = {};
 
-        (products || []).forEach(p => { 
-            if(p.id) nameById[String(p.id)] = p.name; 
-        });
+        (products || []).forEach(p => { if(p.id) nameById[String(p.id)] = p.name; });
 
         (sales || []).forEach(s => {
             if (!s.items) return;
             s.items.forEach(i => {
                 if (i.type === 'meta') return;
                 const qty = Number(i.cantidad || i.qty || i.quantity || 0);
-                // Si existe ID, usar ID, sino usar nombre como key
                 const key = i.id ? String(i.id) : `n:${i.name}`;
                 countsById[key] = (countsById[key] || 0) + qty;
-                
-                // Si no teniamos el nombre del producto localmente, usar el de la venta
                 if (!nameById[key] && i.name) nameById[key] = i.name;
             });
         });
@@ -540,72 +440,22 @@ export async function setupDashboardLogic(router) {
 
         topProductsChartInstance = new Chart(ctx, {
             type: 'doughnut',
-            data: {
-                labels,
-                datasets: [{
-                    data,
-                    backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'],
-                    borderWidth: 2,
-                    borderColor: 'rgba(255,255,255,0.1)', // Separación sutil
-                    hoverOffset: 10
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '70%', // Dona
-                animation: {
-                    animateScale: true,
-                    animateRotate: true
-                },
-                plugins: {
-                    legend: {
-                        display: isAdvanced,
-                        position: 'right',
-                        labels: { 
-                            boxWidth: 12,
-                            font: { size: 11 }
-                        }
-                    }
-                }
-            }
+            data: { labels, datasets: [{ data, backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'], borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', hoverOffset: 10 }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '70%', animation: { animateScale: true, animateRotate: true }, plugins: { legend: { display: isAdvanced, position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } } }
         });
     }
 
     function renderLowStock(products) {
         const el = document.getElementById('low-stock-list');
         if (!el) return;
-        
-        const low = (products || [])
-            .filter(p => !isNaN(Number(p.stock)) && Number(p.stock) <= 10)
-            .sort((a, b) => Number(a.stock) - Number(b.stock))
-            .slice(0, 10);
-
-        if (low.length === 0) {
-            return el.innerHTML = '<div style="color:#10b981; padding:10px; background:rgba(16, 185, 129, 0.1); border-radius:8px;">✅ Inventario saludable</div>';
-        }
-
-        el.innerHTML = `<ul style="padding-left:0; list-style:none; margin:0;">
-            ${low.map((p, index) => {
-                const stockVal = Number(p.stock);
-                const isCritical = stockVal <= 0;
-                const color = isCritical ? '#ef4444' : '#f59e0b';
-                const bg = isCritical ? 'rgba(239, 68, 68, 0.1)' : 'transparent';
-                
-                // Animación simple de entrada para la lista
-                return `<li style="
-                    display:flex; justify-content:space-between; align-items:center;
-                    padding:8px 10px; margin-bottom:5px; border-radius:6px;
-                    background:${bg}; border-left:3px solid ${color};
-                    animation: fadeInUp 0.3s ease-out forwards; animation-delay: ${index * 0.05}s; opacity:0;
-                ">
-                    <span style="font-size:0.9rem;">${p.name}</span>
-                    <b style="color:${color}; font-size:0.9rem;">${stockVal} un.</b>
-                </li>`;
-            }).join('')}
-        </ul>`;
+        const low = (products || []).filter(p => !isNaN(Number(p.stock)) && Number(p.stock) <= 10).sort((a, b) => Number(a.stock) - Number(b.stock)).slice(0, 10);
+        if (low.length === 0) return el.innerHTML = '<div style="color:#10b981; padding:10px; background:rgba(16, 185, 129, 0.1); border-radius:8px;">✅ Inventario saludable</div>';
+        el.innerHTML = `<ul style="padding-left:0; list-style:none; margin:0;">${low.map((p, index) => {
+                const stockVal = Number(p.stock); const isCritical = stockVal <= 0; const color = isCritical ? '#ef4444' : '#f59e0b'; const bg = isCritical ? 'rgba(239, 68, 68, 0.1)' : 'transparent';
+                return `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; margin-bottom:5px; border-radius:6px; background:${bg}; border-left:3px solid ${color}; animation: fadeInUp 0.3s ease-out forwards; animation-delay: ${index * 0.05}s; opacity:0;">
+                    <span style="font-size:0.9rem;">${p.name}</span><b style="color:${color}; font-size:0.9rem;">${stockVal} un.</b></li>`;
+            }).join('')}</ul>`;
     }
 
-    // Init
     loadMetrics();
 }

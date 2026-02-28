@@ -14,6 +14,11 @@ export function renderLogin() {
                         <label>Contraseña</label>
                         <input type="password" id="password" placeholder="Contraseña" required>
                     </div>
+                    
+                    <div style="text-align: right; margin-top: -10px; margin-bottom: 15px;">
+                        <a href="#" id="forgot-password" style="color:#7A3F9D; font-size: 0.85rem; text-decoration:none; font-weight: 500;">¿Olvidaste tu contraseña?</a>
+                    </div>
+
                     <button type="submit" class="btn-login" id="btn-submit">Iniciar Sesión</button>
                     <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
                     <p style="color:#666;">¿Eres cliente?</p>
@@ -30,6 +35,34 @@ export function setupLoginLogic(router) {
     const form = document.getElementById('login-form');
     const errorMsg = document.getElementById('error-message');
     const btnSubmit = document.getElementById('btn-submit');
+
+    const forgotPasswordLink = document.getElementById('forgot-password');
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            // Tomamos el correo si ya lo escribió, si no, lo dejamos en blanco
+            const emailActual = document.getElementById('email').value.trim();
+            const correoRecuperacion = prompt("Ingresa tu correo electrónico para enviarte un enlace de recuperación:", emailActual);
+            
+            // Si el usuario canceló el prompt o lo dejó vacío, no hacemos nada
+            if (!correoRecuperacion) return;
+
+            try {
+                // Llamada directa a Supabase
+                const { error } = await supabase.auth.resetPasswordForEmail(correoRecuperacion, {
+                    redirectTo: window.location.origin // Lo devuelve a la raíz de tu app
+                });
+
+                if (error) throw error;
+
+                alert(" ¡Listo! Te hemos enviado un enlace de recuperación. Por favor revisa tu bandeja de entrada o la carpeta de Spam.");
+            } catch (err) {
+                console.error("Error recuperando contraseña:", err);
+                alert(" Ocurrió un error al intentar enviar el correo. Verifica que la dirección sea correcta o intenta más tarde.");
+            }
+        });
+    }
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();

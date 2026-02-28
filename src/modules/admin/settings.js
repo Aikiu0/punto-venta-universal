@@ -36,12 +36,10 @@ export function renderAdminSettings() {
                     <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
                         ${lockHistory} Historial
                     </button>
-                    
                     <button class="menu-item active"> Configuración</button>
                     <button class="menu-item logout" id="nav-logout"> Salir</button>
                 </nav>
             </aside>
-
             <main class="admin-content">
                 <header class="content-header">
                     <div style="display:flex; align-items:center; gap:10px;">
@@ -77,14 +75,7 @@ export function renderAdminSettings() {
                     </div>
                     <label>Leyenda del Ticket (Pie de página)</label>
                     <textarea id="set-footer" class="form-input" rows="3" placeholder="Ej: No devoluciones. Gracias por su compra." style="width:100%; padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); resize:vertical;">${footer}</textarea>
-                    <button
-  id="btn-update-system"
-  class="btn-secondary"
-  style="width:100%; margin-top:15px; opacity:70.5; cursor:not-allowed;"
-  disabled
->
-  ✅ Sistema actualizado
-</button>
+                    
 
                     <button id="btn-save-settings" class="btn-primary" style="width:100%; margin-top:20px; justify-content:center;">💾 Guardar Cambios</button>
                 </div>

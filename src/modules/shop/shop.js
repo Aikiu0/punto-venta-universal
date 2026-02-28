@@ -178,49 +178,62 @@ export async function setupShopLogic(router) {
     }
 
     async function loadCatalog(businessId) {
-        // CORRECCIÓN: Cargar categorías y productos
-        const { data: cats } = await supabase.from('categories').select('*').eq('business_id', businessId);
-        const { data: prods } = await supabase.from('products').select('*').eq('business_id', businessId).gt('stock', 0);
+        // 1. Cargamos SOLO los productos (ignoramos la tabla categories por ahora)
+        const { data: prods, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('business_id', businessId)
+            .gt('stock', 0); // Solo mostramos los que tienen stock
+            
+        if (error) console.error("Error al cargar productos:", error);
+        
         shopProducts = prods || [];
-        
-        // Renderizar Productos
-        renderProducts(shopProducts);
-        
-        // Renderizar Categorías
-        if (cats && cats.length > 0) {
-            const catList = document.getElementById('shop-categories');
-            if (catList) {
-                // Opción "Todas"
-                catList.innerHTML = `<li class="category-item active" data-cat="all" style="padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; background:#e5e7eb; color:#333; font-weight:bold;">Todas</li>`;
-                
-                cats.forEach(c => {
-                    const li = document.createElement('li');
-                    li.className = 'category-item'; 
-                    li.textContent = c.name;
-                    li.style.cssText = "padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; color:#64748b; transition:0.2s;";
-                    
-                    li.addEventListener('click', () => {
-                        // Reset estilos
-                        document.querySelectorAll('.category-item').forEach(i => {
-                            i.style.background='transparent'; i.style.fontWeight='normal'; i.style.color='#64748b';
-                        });
-                        // Activar actual
-                        li.style.background = '#e5e7eb'; li.style.fontWeight='bold'; li.style.color='#333';
-                        // Filtrar
-                        renderProducts(shopProducts.filter(p => p.category === c.name));
-                    });
-                    catList.appendChild(li);
-                });
 
-                // Listener para "Todas"
-                catList.querySelector('[data-cat="all"]').addEventListener('click', (e) => {
+        // 2. Extraemos las categorías dinámicamente de los productos disponibles
+        // Esto crea un arreglo único (sin repetir) de todas las categorías que existen en tus productos
+        const uniqueCategories = [...new Set(shopProducts.map(p => p.category).filter(c => c && c.trim() !== ''))];
+
+        // 3. Renderizar Productos (Mostramos todos al cargar la página)
+        renderProducts(shopProducts);
+
+        // 4. Renderizar Categorías en el panel lateral (aside)
+        const catList = document.getElementById('shop-categories');
+        if (catList) {
+            // Limpiamos la lista y agregamos la opción "Todas" por defecto
+            catList.innerHTML = `<li class="category-item active" data-cat="all" style="padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; background:#e5e7eb; color:#333; font-weight:bold;">Todas</li>`;
+
+            // Creamos un botón (li) por cada categoría detectada
+            uniqueCategories.forEach(catName => {
+                const li = document.createElement('li');
+                li.className = 'category-item'; 
+                li.textContent = catName; // El nombre de la categoría
+                li.style.cssText = "padding:10px; cursor:pointer; border-radius:8px; margin-bottom:5px; color:#64748b; transition:0.2s;";
+
+                // Lógica al hacer clic en una categoría específica
+                li.addEventListener('click', () => {
+                    // Quitamos el estilo de "seleccionado" a todas
                     document.querySelectorAll('.category-item').forEach(i => {
                         i.style.background='transparent'; i.style.fontWeight='normal'; i.style.color='#64748b';
                     });
-                    e.target.style.background = '#e5e7eb'; e.target.style.fontWeight='bold'; e.target.style.color='#333';
-                    renderProducts(shopProducts);
+                    // Le ponemos estilo de "seleccionado" a la que el usuario hizo clic
+                    li.style.background = '#e5e7eb'; li.style.fontWeight='bold'; li.style.color='#333';
+                    
+                    // Filtramos los productos para mostrar solo los de esta categoría
+                    renderProducts(shopProducts.filter(p => p.category === catName));
                 });
-            }
+                catList.appendChild(li);
+            });
+
+            // Lógica al hacer clic en "Todas"
+            catList.querySelector('[data-cat="all"]').addEventListener('click', (e) => {
+                document.querySelectorAll('.category-item').forEach(i => {
+                    i.style.background='transparent'; i.style.fontWeight='normal'; i.style.color='#64748b';
+                });
+                e.target.style.background = '#e5e7eb'; e.target.style.fontWeight='bold'; e.target.style.color='#333';
+                
+                // Mostramos todos los productos de nuevo
+                renderProducts(shopProducts);
+            });
         }
     }
 
@@ -235,9 +248,15 @@ export async function setupShopLogic(router) {
             const unit = p.unit || 'pz';
             const bulkBadge = p.is_bulk ? `<span style="font-size:0.65rem; background:#e0f2fe; color:#0284c7; padding:2px 6px; border-radius:4px; font-weight:bold;">GRANEL</span>` : '';
 
-            // CORRECCIÓN: Se agregó la línea "Disponible: X"
+            // 🌟 AQUÍ ESTÁ LA MAGIA DE LA IMAGEN
+            // Evaluamos si el producto tiene un link en image_url
+            const imageElement = p.image_url 
+                ? `<img src="${p.image_url}" alt="${p.name}" style="width:100%; height:160px; object-fit:cover; border-radius:12px 12px 0 0;">` 
+                : `<div style="height:160px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:3rem; border-radius:12px 12px 0 0;">📦</div>`;
+
+            // CORRECCIÓN: Se inyecta imageElement en lugar del div hardcodeado
             card.innerHTML = `
-                <div style="height:140px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:3rem;">📦</div>
+                ${imageElement}
                 <div style="padding:15px; flex:1; display:flex; flex-direction:column;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                         <span style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; font-weight:bold;">${p.category || 'General'}</span>${bulkBadge}
@@ -384,7 +403,7 @@ export async function setupShopLogic(router) {
             p_business_id: currentBusiness.id,
             p_customer_name: name,
             p_customer_contact:phone,
-            p_items: shopCart,
+            p_items: itemsToSave,
             p_total: total
             });
 

@@ -1,4 +1,4 @@
-// src/modules/admin/inventory.js - UNIFICADO: ESTILO MODERNO + LÓGICA DE BLOQUEO
+// src/modules/admin/inventory.js - UNIFICADO: ESTILO MODERNO + LÓGICA DE BLOQUEO + IMÁGENES
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
 import { db } from '../../data/db-local.js';
@@ -8,10 +8,6 @@ import { renderSidebarHeader } from './components/sidebarHeader.js';
 let allProducts = [];
 
 export function renderAdminInventory() {
-    // --- CONTROL DE PERMISOS (LÓGICA DEL ARCHIVO 1) ---
-    // En lugar de ocultar con display:none, definimos el icono de candado y opacidad
-    // para que el usuario vea la opción pero sepa que es Premium.
-    
     const lockHistory = PermissionService.can('history') ? '' : '🔒 ';
     const lockOrders = PermissionService.can('web_orders') ? '' : '🔒 ';
     const lockSettings = PermissionService.can('settings') ? '' : '🔒 ';
@@ -25,7 +21,6 @@ export function renderAdminInventory() {
     const lockExport = canExport ? '' : '🔒';
     const opacityExport = canExport ? '1' : '0.6';
     
-
     return `
         <div class="admin-container">
             <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -36,23 +31,18 @@ export function renderAdminInventory() {
                 </div>
                 <nav class="sidebar-menu">
                     <button class="menu-item" id="nav-dash"> Dashboard</button>
-                    
                     <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
                         ${lockOrders} Pedidos Web
                     </button>
-                    
                     <button class="menu-item active"> Inventario</button>
-                    
                     <button class="menu-item" id="nav-pos"> Ir a Caja</button>
                     <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Proveedores</button>
-                    
                     <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
                         ${lockHistory} Historial
                     </button>
                     <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event, 'settings')">
                         ${lockSettings} Configuración
                     </button>
-                    
                     <button class="menu-item logout" id="nav-logout" style="margin-top:auto; color:var(--danger-color);"> Salir</button>
                 </nav>
             </aside>
@@ -63,7 +53,7 @@ export function renderAdminInventory() {
                         <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer;">☰</button>
                         <div class="page-title">
                             <h1>Gestión de Inventario</h1>
-                            <p>Administra productos, costos y precios.</p>
+                            <p>Administra productos, fotos, costos y precios.</p>
                         </div>
                     </div>
                     
@@ -71,20 +61,17 @@ export function renderAdminInventory() {
                         <button id="theme-toggle-inv" class="icon-btn" title="Cambiar Tema" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); width:40px; height:40px; border-radius:8px; cursor:pointer;">
                             🌗
                         </button>
-                        
                         <input type="file" id="csv-input" accept=".csv" style="display:none;">
                         <button id="btn-import-csv" class="btn-secondary" 
                             style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:5px; opacity: ${opacityImport};"
                             onclick="if(window.checkPlan(event, 'import_excel')) document.getElementById('csv-input').click();">
                             ${lockImport} 📥 Importar
                         </button>
-
                         <button id="btn-export-csv" class="btn-secondary" 
                             style="background:#6366f1; color:white; border:none; padding:10px 15px; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:5px; opacity: ${opacityExport};"
                             onclick="return window.checkPlan(event, 'export_excel')">
                             ${lockExport} 📤 Exportar
                         </button>
-
                         <button id="btn-add-product" class="btn-primary" style="padding:10px 15px; border-radius:8px;">
                             <span>+</span> Nuevo
                         </button>
@@ -96,30 +83,41 @@ export function renderAdminInventory() {
                         <input type="text" id="inventory-search" placeholder=" Buscar por nombre, código o categoría..." 
                             style="width: 100%; padding: 12px; border: 1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius: 8px; font-size: 1rem; outline: none;">
                     </div>
-                <div style="overflow-x:auto;">
-                    <table class="modern-table">
-                        <thead>
-                            <tr>
-                                <th>Producto</th>
-                                <th>SKU</th>
-                                <th>Costo</th>
-                                <th>Precio</th>
-                                <th>Stock</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-table-body">
-                            <tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-secondary);">Cargando inventario...</td></tr>
-                        </tbody>
-                    </table>
-                </div></div>
+                    <div style="overflow-x:auto;">
+                        <table class="modern-table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>SKU</th>
+                                    <th>Costo</th>
+                                    <th>Precio</th>
+                                    <th>Stock</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body">
+                                <tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-secondary);">Cargando inventario...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </main>
 
             <div id="product-modal" class="admin-modal">
-                <div class="modal-glass">
+                <div class="modal-glass" style="max-height: 90vh; overflow-y: auto;">
                     <h2 id="modal-title" style="margin-bottom:20px; color:var(--text-primary);">Producto</h2>
                     <input type="hidden" id="prod-id">
                     <div style="display:flex; flex-direction:column; gap:15px;">
+                        
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <label style="font-size:0.8rem; color:var(--text-secondary);">Foto del Producto</label>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <img id="prod-image-preview" src="" style="display:none; width:60px; height:60px; object-fit:cover; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-input);">
+                                <input type="file" id="prod-image" accept="image/*" capture="environment" class="form-input" style="flex:1; padding:8px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:6px; font-size: 0.9rem;">
+                            </div>
+                            <span id="upload-status" style="font-size:0.85rem; color:#10b981; font-weight:bold; display:none;">Subiendo imagen... ⏳</span>
+                        </div>
+
                         <input type="text" id="prod-name" placeholder="Nombre del Producto" class="form-input" style="padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:6px;">
                         <input type="text" id="prod-sku" placeholder="SKU / Código de Barras" class="form-input" style="padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:6px;">
                         <div style="display:flex; gap:5px;">
@@ -172,7 +170,6 @@ export async function setupInventoryLogic(router) {
     const btnOpen = document.getElementById('mobile-menu-btn');
     const btnClose = document.getElementById('btn-close-sidebar');
     
-    // Si estamos en móvil, mostrar botón de cerrar
     if(window.innerWidth <= 768 && btnClose) btnClose.style.display = 'block';
     
     function toggleMenu(show) {
@@ -186,21 +183,19 @@ export async function setupInventoryLogic(router) {
     const navigateTo = (path) => { toggleMenu(false); router.navigate(path); };
     
     document.getElementById('nav-dash').addEventListener('click', () => navigateTo('/admin'));
-    
-    // Botones de navegación (los bloqueados ya tienen el onclick inline)
     const btnOrders = document.getElementById('nav-orders'); 
-    if(btnOrders && !PermissionService.can('web_orders')) { /* Lógica inline maneja el bloqueo */ }
+    if(btnOrders && !PermissionService.can('web_orders')) {  }
     else if (btnOrders) { btnOrders.addEventListener('click', () => navigateTo('/admin/orders')); }
 
     const btnPos = document.getElementById('nav-pos'); if(btnPos) btnPos.addEventListener('click', () => navigateTo('/pos'));
     
     const btnHist = document.getElementById('nav-history'); 
-    if(btnHist && !PermissionService.can('history')) { /* Lógica inline */ }
+    if(btnHist && !PermissionService.can('history')) {  }
     else if(btnHist) { btnHist.addEventListener('click', () => navigateTo('/admin/history')); }
     const btnSup = document.getElementById('nav-suppliers'); 
     if (btnSup) btnSup.addEventListener('click', () => navigateTo('/admin/suppliers'));
     const btnSet = document.getElementById('nav-settings'); 
-    if(btnSet && !PermissionService.can('settings')) { /* Lógica inline */ }
+    if(btnSet && !PermissionService.can('settings')) {  }
     else if(btnSet) { btnSet.addEventListener('click', () => navigateTo('/admin/settings')); }
     
     document.getElementById('nav-logout').addEventListener('click', async () => { await supabase.auth.signOut(); navigateTo('/'); });
@@ -210,6 +205,7 @@ export async function setupInventoryLogic(router) {
     const tableBody = document.getElementById('inventory-table-body');
     const modal = document.getElementById('product-modal');
     const searchInput = document.getElementById('inventory-search');
+    
     // Inputs del modal
     const pId = document.getElementById('prod-id');
     const pName = document.getElementById('prod-name');
@@ -220,10 +216,27 @@ export async function setupInventoryLogic(router) {
     const pStock = document.getElementById('prod-stock');
     const pUnit = document.getElementById('prod-unit');
     const pBulk = document.getElementById('prod-bulk');
+    
+    // Imagen
+    const pImage = document.getElementById('prod-image');
+    const pImagePreview = document.getElementById('prod-image-preview');
+    const uploadStatus = document.getElementById('upload-status');
+    let currentImageUrl = ''; // Guarda la URL temporal de la foto
+
+    // Mostrar vista previa local al elegir una foto
+    pImage.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            pImagePreview.src = URL.createObjectURL(file);
+            pImagePreview.style.display = 'block';
+        } else {
+            if(!currentImageUrl) pImagePreview.style.display = 'none';
+            else pImagePreview.src = currentImageUrl;
+        }
+    });
 
     // --- LÓGICA IMPORTAR CSV ---
     const inputCsv = document.getElementById('csv-input');
-    // Nota: El click del input file se dispara desde el HTML si window.checkPlan devuelve true
     if (inputCsv) {
         inputCsv.addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -243,10 +256,8 @@ export async function setupInventoryLogic(router) {
                     if (!row) continue;
                     const cols = row.split(',');
                     if (cols.length < 3) continue; 
-                    // Ignorar cabecera si existe
                     if (cols[0].toLowerCase().includes('nombre') && i === 0) continue;
 
-                    // Mapear columnas (Orden esperado: Nombre, SKU, Precio, Costo, Stock, Categoria)
                     const name = cols[0].trim();
                     const sku = cols[1].trim();
                     const price = parseFloat(cols[2]) || 0;
@@ -283,10 +294,8 @@ export async function setupInventoryLogic(router) {
 
     // --- LÓGICA EXPORTAR CSV ---
     const btnExport = document.getElementById('btn-export-csv');
-    // El bloqueo ya está en el onclick del HTML, aquí solo añadimos la lógica funcional
     if(btnExport) {
         btnExport.addEventListener('click', () => {
-            // Verificación extra por seguridad (aunque checkPlan lo filtra visualmente)
             if(!PermissionService.can('export_excel')) return; 
 
             if(allProducts.length === 0) return alert("No hay productos para exportar.");
@@ -334,9 +343,11 @@ export async function setupInventoryLogic(router) {
         if(products.length === 0) return tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px;">Inventario Vacío</td></tr>`;
 
         products.forEach(p => {
+            // Un pequeño icono visual si el producto tiene foto
+            const imgIcon = p.image_url ? ' 🖼️' : '';
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><b>${p.name}</b>${p.is_bulk ? ' 📏' : ''}</td>
+                <td><b>${p.name}</b>${p.is_bulk ? ' 📏' : ''}${imgIcon}</td>
                 <td><small style="color:var(--text-secondary)">${p.sku || '--'}</small></td>
                 <td style="color:var(--text-secondary);">$${(p.cost_price || 0).toFixed(2)}</td>
                 <td style="font-weight:bold; color:var(--success-bg);">$${p.price.toFixed(2)}</td>
@@ -385,6 +396,17 @@ export async function setupInventoryLogic(router) {
             pId.value=p.id; pName.value=p.name; pSku.value=p.sku; pCat.value=p.category;
             pCost.value=p.cost_price || 0;
             pPrice.value=p.price; pStock.value=p.stock; pUnit.value=p.unit||'pz'; pBulk.checked=p.is_bulk;
+            
+            // Lógica de la imagen al editar
+            pImage.value = ''; 
+            currentImageUrl = p.image_url || '';
+            if (currentImageUrl) {
+                pImagePreview.src = currentImageUrl;
+                pImagePreview.style.display = 'block';
+            } else {
+                pImagePreview.src = '';
+                pImagePreview.style.display = 'none';
+            }
         }
         modal.style.display = 'flex';
     }
@@ -392,6 +414,13 @@ export async function setupInventoryLogic(router) {
     document.getElementById('btn-add-product').addEventListener('click', () => {
         document.getElementById('modal-title').textContent = "Nuevo";
         pId.value=''; pName.value=''; pSku.value=''; pCat.value=''; pCost.value=''; pPrice.value=''; pStock.value=''; pUnit.value='pz'; pBulk.checked=false;
+        
+        // Limpiar imagen al crear nuevo
+        pImage.value = '';
+        currentImageUrl = '';
+        pImagePreview.src = '';
+        pImagePreview.style.display = 'none';
+        
         modal.style.display = 'flex';
     });
 
@@ -399,20 +428,54 @@ export async function setupInventoryLogic(router) {
 
     document.getElementById('btn-save-prod').addEventListener('click', async () => {
         if (!businessId) return alert("Error crítico: No hay ID de negocio.");
+        if(!pName.value || !pPrice.value) return alert("Faltan datos (Nombre y Precio obligatorios)");
 
+        const saveBtn = document.getElementById('btn-save-prod');
+        saveBtn.disabled = true; // Prevenir múltiples clics
+
+        let finalImageUrl = currentImageUrl;
+        const file = pImage.files[0];
+
+        // 1. SI HAY IMAGEN NUEVA, LA SUBIMOS PRIMERO
+        if (file) {
+            uploadStatus.style.display = 'block';
+            
+            // Generamos un nombre único para que no se sobreescriban fotos
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${businessId}_${Date.now()}.${fileExt}`;
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('product_images')
+                .upload(fileName, file);
+
+            if (uploadError) {
+                console.error("Error al subir foto:", uploadError);
+                alert("No se pudo subir la foto, pero guardaremos el resto del producto.");
+            } else {
+                // Si se subió, obtenemos el link público mágico
+                const { data } = supabase.storage
+                    .from('product_images')
+                    .getPublicUrl(fileName);
+                finalImageUrl = data.publicUrl;
+            }
+            uploadStatus.style.display = 'none';
+        }
+
+        // 2. GUARDAMOS EL PRODUCTO EN LA BASE DE DATOS (Con el link de la foto si existe)
         const data = {
             name: pName.value, sku: pSku.value, category: pCat.value, unit: pUnit.value,
             cost_price: parseFloat(pCost.value) || 0,
             price: parseFloat(pPrice.value), stock: parseFloat(pStock.value), is_bulk: pBulk.checked,
-            business_id: businessId 
+            business_id: businessId,
+            image_url: finalImageUrl 
         };
-        
-        if(!data.name || !data.price) return alert("Faltan datos");
 
         if(pId.value) await supabase.from('products').update(data).eq('id', pId.value);
         else await supabase.from('products').insert(data);
         
+        saveBtn.disabled = false;
         modal.style.display='none'; 
+        
         if(navigator.onLine) await syncService.downloadProducts();
         loadProducts();
     });
@@ -421,31 +484,20 @@ export async function setupInventoryLogic(router) {
         if(!confirm("¿Borrar producto?")) return;
 
         try {
-            // 1. ACTUALIZACIÓN VISUAL INSTANTÁNEA (Optimistic UI)
-            // Eliminamos el producto del array en memoria inmediatamente
             allProducts = allProducts.filter(p => p.id != id);
-            // Redibujamos la tabla sin esperar al servidor
             renderTable(allProducts);
 
-            // 2. ELIMINAR DE SUPABASE
             const { error } = await supabase.from('products').delete().eq('id', id);
-            
             if (error) throw error;
 
-            // 3. ELIMINAR DE BD LOCAL (Para consistencia si se recarga la página)
-            // Convertimos a número por seguridad, ya que del HTML viene como string
             const idParsed = isNaN(Number(id)) ? id : Number(id);
             await db.products.delete(idParsed);
 
-            // 4. SINCRONIZACIÓN SILENCIOSA (Opcional, para asegurar todo)
-            if(navigator.onLine) {
-                 await syncService.downloadProducts();
-            }
+            if(navigator.onLine) await syncService.downloadProducts();
 
         } catch (error) {
             console.error("Error al eliminar:", error);
             alert("Hubo un error al eliminar. Se recargarán los datos.");
-            // Si falló, volvemos a cargar todo para que el producto reaparezca
             loadProducts(); 
         }
     }

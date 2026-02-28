@@ -20,6 +20,9 @@ import { renderDashboard, setupDashboardLogic } from './modules/admin/dashboard.
 import { renderAdminSettings, setupSettingsLogic } from './modules/admin/settings.js';
 import { renderSuppliers, setupSuppliersLogic } from './modules/admin/suppliers.js';
 import { renderAdminBilling, setupBillingLogic } from './modules/admin/billing.js';
+import { hasValidAccess } from './services/subscription.js'; 
+import { renderResetPassword, setupResetPasswordLogic } from './modules/auth/reset-password.js';
+
 const router = new Navigo('/', { hash: true });
 const app = document.querySelector('#app');
 const setContent = (html) => { app.innerHTML = html; };
@@ -40,78 +43,172 @@ async function initApp() {
 // Ejecutamos inicialización
 initApp();
 
+// --- GUARDIA DE RUTAS Y SUSCRIPCIÓN ---
+// --- GUARDIA DE RUTAS Y SUSCRIPCIÓN (CON RASTREO) ---
+async function requireAuthAndActiveSubscription(router, renderCallback) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { 
+        router.navigate('/'); 
+        return; 
+    }
+
+    const { data: profile, error } = await supabase
+        .from('profiles')
+        .select(`
+            business_id,
+            businesses (
+                subscription_status,
+                current_period_end
+            )
+        `)
+        .eq('id', session.user.id)
+        .single();
+
+    // 🕵️ DETECTOR 1: ¿Qué nos trajo la base de datos?
+    console.log("🔍 Datos de Supabase:", profile);
+
+    if (error || !profile || !profile.businesses) {
+        console.error("Error obteniendo estado de suscripción:", error);
+        router.navigate('/'); 
+        return;
+    }
+
+    // 🕵️ DETECTOR 2: ¿Qué dice nuestra regla matemática?
+    const tieneAcceso = hasValidAccess(profile.businesses);
+    console.log("🛡️ ¿Tiene Acceso Válido?:", tieneAcceso);
+
+    if (!tieneAcceso) {
+        // 🕵️ DETECTOR 3: ¿Entró al bloque de suspensión?
+        console.log("🚫 BLOQUEADO: Redirigiendo a /suspended...");
+        router.navigate('/suspended');
+        return;
+    }
+
+    // 🕵️ DETECTOR 4: ¿Lo dejó pasar?
+    console.log("✅ PERMITIDO: Renderizando vista...");
+    renderCallback();
+}
+supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+        console.log("¡Evento de recuperación detectado!");
+        router.navigate('/reset-password');
+    }
+});
 // --- RUTAS ---
 router
-    // 1. RUTA RAÍZ (LOGIN) - Faltaba esto
+    // 1. RUTA RAÍZ (LOGIN)
     .on('/', () => {
-        // Si ya hay sesión, podrías redirigir a /admin o /pos automáticamente
         setContent(renderLogin());
         setupLoginLogic(router);
     })
 
-    .on('/admin/suppliers', async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { router.navigate('/'); return; }
-    setContent(renderSuppliers()); setupSuppliersLogic(router);
-})
-.on('/admin/billing', async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { router.navigate('/'); return; }
-    setContent(renderAdminBilling()); setupBillingLogic(router);
-})
+    .on('/reset-password', () => {
+        const app = document.getElementById('app');
+        app.innerHTML = renderResetPassword();
+        setupResetPasswordLogic(router);
+    })
+    // 2. RUTA DE SUSPENSIÓN (Si no han pagado)
+    .on('/suspended', async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { router.navigate('/'); return; }
 
+        setContent(`
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; text-align: center; font-family: system-ui, sans-serif; padding: 20px; background-color: #f9fafb;">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#d32f2f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 20px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <h1 style="color: #111827; margin-bottom: 10px;">Acceso Suspendido</h1>
+                <p style="color: #4b5563; max-width: 400px; margin-bottom: 30px;">
+                    El acceso a tu sistema ArchSell POS ha sido pausado. Por favor, comunícate con el administrador para regularizar tu cuenta.
+                </p>
+                <button id="logout-suspended-btn" style="padding: 10px 24px; cursor: pointer; background: #7A3F9D; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                    Cerrar Sesión
+                </button>
+            </div>
+        `);
+
+        document.getElementById('logout-suspended-btn').addEventListener('click', async () => {
+            await supabase.auth.signOut();
+            router.navigate('/');
+        });
+    })
+
+    // 3. RUTA PÚBLICA (No requiere sesión ni suscripción)
     .on('/shop', () => {
         setContent(renderShop());
         setupShopLogic(router);
         SettingsService.applyToDOM();
     })
 
-    .on('/pos', async () => {
+    // 4. RUTA DE BILLING (Solo requiere sesión para que puedan pagar)
+    .on('/admin/billing', async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) { router.navigate('/'); return; }
-        setContent(renderPOS());
-        setupPOSLogic(router);
-        SettingsService.applyToDOM();
+        setContent(renderAdminBilling()); 
+        setupBillingLogic(router);
     })
 
-    .on('/admin', async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { router.navigate('/'); return; }
-        setContent(renderDashboard());
-        setupDashboardLogic(router);
-        SettingsService.applyToDOM();
+    
+    // ==========================================
+    // 5. RUTAS PROTEGIDAS (Requieren Sesión + Pago)
+    // ==========================================
+    
+    .on('/pos', () => {
+        requireAuthAndActiveSubscription(router, () => {
+            setContent(renderPOS());
+            setupPOSLogic(router);
+            SettingsService.applyToDOM();
+        });
     })
 
-    .on('/admin/inventory', async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { router.navigate('/'); return; }
-        setContent(renderAdminInventory());
-        setupInventoryLogic(router);
-        SettingsService.applyToDOM();
+    .on('/admin', () => {
+        requireAuthAndActiveSubscription(router, () => {
+            setContent(renderDashboard());
+            setupDashboardLogic(router);
+            SettingsService.applyToDOM();
+        });
     })
 
-    .on('/admin/orders', async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { router.navigate('/'); return; }
-        setContent(renderAdminOrders());
-        setupOrdersLogic(router);
-        SettingsService.applyToDOM();
+    .on('/admin/inventory', () => {
+        requireAuthAndActiveSubscription(router, () => {
+            setContent(renderAdminInventory());
+            setupInventoryLogic(router);
+            SettingsService.applyToDOM();
+        });
     })
 
-    .on('/admin/settings', async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { router.navigate('/'); return; }
-        setContent(renderAdminSettings());
-        setupSettingsLogic(router);
-        SettingsService.applyToDOM();
+    .on('/admin/orders', () => {
+        requireAuthAndActiveSubscription(router, () => {
+            setContent(renderAdminOrders());
+            setupOrdersLogic(router);
+            SettingsService.applyToDOM();
+        });
+    })
+
+    .on('/admin/settings', () => {
+        requireAuthAndActiveSubscription(router, () => {
+            setContent(renderAdminSettings());
+            setupSettingsLogic(router);
+            SettingsService.applyToDOM();
+        });
     })
     
-    .on('/admin/history', async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { router.navigate('/'); return; }
-        setContent(renderHistory());
-        setupHistoryLogic(router);
-        SettingsService.applyToDOM();
+    .on('/admin/history', () => {
+        requireAuthAndActiveSubscription(router, () => {
+            setContent(renderHistory());
+            setupHistoryLogic(router);
+            SettingsService.applyToDOM();
+        });
     })
-    
+
+    .on('/admin/suppliers', () => {
+        requireAuthAndActiveSubscription(router, () => {
+            setContent(renderSuppliers());
+            setupSuppliersLogic(router);
+        });
+    })
+
+    // Finalmente resolvemos las rutas
     .resolve();
