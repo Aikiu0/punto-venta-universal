@@ -106,7 +106,7 @@ function createUpsellModal() {
             <div class="upsell-icon">💎</div>
             <h2 class="upsell-title">Función Premium</h2>
             <p class="upsell-text">Esta función está disponible exclusivamente en nuestros planes superiores. ¡Actualiza para desbloquear todo el potencial!</p>
-            <a href="https://wa.me/527712351341?text=Hola,%20me%20interesa%20actualizar%20mi%20plan%20pos." target="_blank" class="upsell-btn">
+            <a href="https://wa.me/527711836546h?text=Hola,%20me%20interesa%20actualizar%20mi%20plan%20pos." target="_blank" class="upsell-btn">
                 <span>Contactar Ventas</span>
             </a>
         </div>

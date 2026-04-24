@@ -32,7 +32,7 @@ export function renderAdminSettings() {
                     
                     <button class="menu-item" id="nav-inventory"> Inventario</button>
                     <button class="menu-item" id="nav-pos"> Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Proveedores</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Estados de cuenta</button>
                     <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
                         ${lockHistory} Historial
                     </button>

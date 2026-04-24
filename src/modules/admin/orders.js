@@ -15,7 +15,7 @@ export function renderAdminOrders() {
                     <button class="menu-item active"> Pedidos Web</button>
                     <button class="menu-item" id="nav-inventory"> Inventario</button>
                     <button class="menu-item" id="nav-pos"> Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')"> Proveedores</button>
+                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')"> Estados de cuenta</button>
                     <button class="menu-item" id="nav-history"> Historial</button>
                     
                     <button class="menu-item" id="nav-settings"> Configuración</button>

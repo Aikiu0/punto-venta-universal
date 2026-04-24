@@ -1,5 +1,15 @@
 import { supabase } from '../../data/supabase';
 
+const { data: staffData } = await supabase
+  .from('branch_staff')
+  .select('branch_id, role, branches(name,color)')
+  .eq('user_id', user.id)
+  .single();
+
+localStorage.setItem('archsell_branch_id', staffData.branch_id);
+localStorage.setItem('archsell_branch_role', staffData.role);
+localStorage.setItem('archsell_branch_name', staffData.branches.name);
+
 export function renderLogin() {
     return `
         <div class="login-container">

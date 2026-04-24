@@ -3,6 +3,12 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('PuntoVentaDB');
 
+db.version(5).stores({
+  products: 'id, sku, name, category, business_id, branch_id',
+  sales:    '++id, date, sync_status, business_id, branch_id',
+  settings: 'id'
+});
+
 // CAMBIO CRÍTICO: Subimos a versión 4 para aplicar la corrección de 'settings'
 db.version(4).stores({
   // products: ID texto (UUID) para compatibilidad con Supabase

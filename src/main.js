@@ -90,10 +90,19 @@ async function requireAuthAndActiveSubscription(router, renderCallback) {
 }
 supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
-        console.log("¡Evento de recuperación detectado!");
         router.navigate('/reset-password');
     }
 });
+if (window.location.hash.includes('access_token')) {
+    console.log("Token de Supabase detectado en la URL.");
+    
+    // Si es una invitación o una recuperación, forzamos la redirección a nueva contraseña
+    if (window.location.hash.includes('type=invite') || window.location.hash.includes('type=recovery')) {
+        setTimeout(() => {
+            router.navigate('/reset-password');
+        }, 800); // Le damos casi 1 segundo a Supabase para procesar la sesión internamente
+    }
+}
 // --- RUTAS ---
 router
     // 1. RUTA RAÍZ (LOGIN)
