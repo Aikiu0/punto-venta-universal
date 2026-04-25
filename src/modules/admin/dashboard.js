@@ -5,35 +5,31 @@ import { db } from '../../data/db-local.js';
 import { syncService } from '../../services/sync.js';
 import { PermissionService } from '../../services/permissions.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
+import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 
 let salesChartInstance = null;
 const activeAnimations = {};
 
 const icon = (name) => {
     const icons = {
-        dashboard: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13.2c0-.75.42-1.43 1.08-1.79l6.5-3.55a2 2 0 0 1 1.84 0l6.5 3.55A2.04 2.04 0 0 1 20 13.2V19a2 2 0 0 1-2 2h-3.25a.75.75 0 0 1-.75-.75V16a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v4.25a.75.75 0 0 1-.75.75H6a2 2 0 0 1-2-2z" fill="currentColor"/></svg>`,
-        orders: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.75A2.75 2.75 0 0 1 9.75 2h4.5A2.75 2.75 0 0 1 17 4.75V6h1.25A2.75 2.75 0 0 1 21 8.75v8.5A2.75 2.75 0 0 1 18.25 20H5.75A2.75 2.75 0 0 1 3 17.25v-8.5A2.75 2.75 0 0 1 5.75 6H7zm1.5 0V6h7V4.75c0-.69-.56-1.25-1.25-1.25h-4.5c-.69 0-1.25.56-1.25 1.25" fill="currentColor"/></svg>`,
-        inventory: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.75A2.75 2.75 0 0 1 6.75 5h10.5A2.75 2.75 0 0 1 20 7.75v8.5A2.75 2.75 0 0 1 17.25 19H6.75A2.75 2.75 0 0 1 4 16.25zm4.75 1.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5zm0 4a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5z" fill="currentColor"/></svg>`,
-        pos: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.75 3h10.5A2.75 2.75 0 0 1 20 5.75v12.5A2.75 2.75 0 0 1 17.25 21H6.75A2.75 2.75 0 0 1 4 18.25V5.75A2.75 2.75 0 0 1 6.75 3M8 7.25c0 .41.34.75.75.75h6.5a.75.75 0 0 0 0-1.5h-6.5A.75.75 0 0 0 8 7.25m.75 3.75A.75.75 0 0 0 8 11.75v4.5c0 .41.34.75.75.75h6.5c.41 0 .75-.34.75-.75v-4.5a.75.75 0 0 0-.75-.75z" fill="currentColor"/></svg>`,
-        suppliers: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.75A2.75 2.75 0 0 1 6.75 6h10.5A2.75 2.75 0 0 1 20 8.75v6.5A2.75 2.75 0 0 1 17.25 18H6.75A2.75 2.75 0 0 1 4 15.25zm4.75.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5m-1 3.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5z" fill="currentColor"/></svg>`,
-        history: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 1-8.95 10h1.53A7.5 7.5 0 1 0 12 4.5c-1.93 0-3.69.73-5.02 1.93L9.5 9H3V2.5l2.9 2.9A8.96 8.96 0 0 1 12 3m-.75 4.25c0-.41.34-.75.75-.75s.75.34.75.75v4.19l2.47 1.42a.75.75 0 0 1-.74 1.3l-2.85-1.63a1.5 1.5 0 0 1-.88-1.3z" fill="currentColor"/></svg>`,
-        settings: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10.34 2.78 1.66-.96 1.66.96.45 1.84a7.92 7.92 0 0 1 1.47.86l1.82-.56 1.66.96v1.92l-1.37 1.3c.05.3.08.6.08.9s-.03.6-.08.9l1.37 1.3v1.92l-1.66.96-1.82-.56c-.46.35-.96.64-1.47.86l-.45 1.84-1.66.96-1.66-.96-.45-1.84a7.92 7.92 0 0 1-1.47-.86l-1.82.56-1.66-.96v-1.92l1.37-1.3A5.7 5.7 0 0 1 6.2 12c0-.3.03-.6.08-.9L4.9 9.8V7.88l1.66-.96 1.82.56c.46-.35.96-.64 1.47-.86zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6" fill="currentColor"/></svg>`,
-        logout: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.75 3a.75.75 0 0 1 0 1.5H7A2.5 2.5 0 0 0 4.5 7v10A2.5 2.5 0 0 0 7 19.5h3.75a.75.75 0 0 1 0 1.5H7A4 4 0 0 1 3 17V7a4 4 0 0 1 4-4zm5.72 4.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 1 1-1.06-1.06l2.97-2.97H9.75a.75.75 0 0 1 0-1.5h9.69l-2.97-2.97a.75.75 0 0 1 0-1.06" fill="currentColor"/></svg>`,
-        theme: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.25a.75.75 0 0 1 .75.75v1.25a.75.75 0 0 1-1.5 0V4a.75.75 0 0 1 .75-.75M6.52 5.47a.75.75 0 0 1 1.06 0l.88.88A.75.75 0 1 1 7.4 7.41l-.88-.88a.75.75 0 0 1 0-1.06m10.9 0a.75.75 0 0 1 0 1.06l-.88.88a.75.75 0 0 1-1.06-1.06l.88-.88a.75.75 0 0 1 1.06 0M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10m-8 4.25h1.25a.75.75 0 0 1 0 1.5H4a.75.75 0 0 1 0-1.5m14.75 0H20a.75.75 0 0 1 0 1.5h-1.25a.75.75 0 0 1 0-1.5M7.4 16.59a.75.75 0 0 1 1.06 1.06l-.88.88a.75.75 0 0 1-1.06-1.06zm9.2 0 .88.88a.75.75 0 0 1-1.06 1.06l-.88-.88a.75.75 0 1 1 1.06-1.06M12 18.75a.75.75 0 0 1 .75.75v1.25a.75.75 0 0 1-1.5 0V19.5a.75.75 0 0 1 .75-.75" fill="currentColor"/></svg>`,
-        sales: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18.5A2.5 2.5 0 0 1 3.5 16V8A2.5 2.5 0 0 1 6 5.5h12A2.5 2.5 0 0 1 20.5 8v8a2.5 2.5 0 0 1-2.5 2.5zm0-11.5a1 1 0 0 0-1 1v.25h14V8a1 1 0 0 0-1-1zm-1 3v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6z" fill="currentColor"/></svg>`,
-        profit: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.41 0 .75.34.75.75v.96c1.98.24 3.5 1.64 3.5 3.54a.75.75 0 0 1-1.5 0c0-1.14-1.11-2.05-2.75-2.05s-2.75.91-2.75 2.05c0 1 .83 1.48 2.98 1.94 1.95.42 4.27 1 4.27 3.56 0 1.94-1.57 3.36-3.75 3.58v.92a.75.75 0 0 1-1.5 0v-.92c-2.18-.22-3.75-1.64-3.75-3.58a.75.75 0 0 1 1.5 0c0 1.14 1.11 2.05 3 2.05s3-.91 3-2.05c0-1.12-.94-1.57-3.09-2.03C8.96 12.5 7.75 11.72 7.75 9.25c0-1.9 1.52-3.3 3.5-3.54v-.96c0-.41.34-.75.75-.75" fill="currentColor"/></svg>`,
-        month: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.75 3a.75.75 0 0 1 .75.75V5h7V3.75a.75.75 0 0 1 1.5 0V5h.25A2.75 2.75 0 0 1 20 7.75v9.5A2.75 2.75 0 0 1 17.25 20H6.75A2.75 2.75 0 0 1 4 17.25v-9.5A2.75 2.75 0 0 1 6.75 5H7V3.75A.75.75 0 0 1 7.75 3m-2.25 6v8.25c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V9z" fill="currentColor"/></svg>`,
-        avg: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5 4.5 8.25 12 12l7.5-3.75zm-6 5.1v4.65L12 18l6-3.75V9.6L12.34 12.4a.75.75 0 0 1-.68 0z" fill="currentColor"/></svg>`,
-        alert: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75 2.84 19.5c-.38.66.09 1.5.84 1.5h16.64c.75 0 1.22-.84.84-1.5zM12 9c.41 0 .75.34.75.75v4.5a.75.75 0 0 1-1.5 0v-4.5c0-.41.34-.75.75-.75m0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2" fill="currentColor"/></svg>`,
-        trend: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16.25 10.25 11l3 3L19 8.25V12a.75.75 0 0 0 1.5 0V6.5A1.5 1.5 0 0 0 19 5h-5.5a.75.75 0 0 0 0 1.5h3.69l-4.94 4.94-3-3a1 1 0 0 0-1.41 0L3.94 15.2A.75.75 0 1 0 5 16.25" fill="currentColor"/></svg>`,
-        products: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.75 4 7v10l8 4.25L20 17V7zm0 1.7 6.15 3.27L12 11 5.85 7.72zM5.5 9.03l5.75 3.05v7.16L5.5 16.2zm7.25 10.21v-7.16l5.75-3.05v7.17z" fill="currentColor"/></svg>`,
-        chart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.75 19A2.75 2.75 0 0 1 3 16.25v-8.5A2.75 2.75 0 0 1 5.75 5h12.5A2.75 2.75 0 0 1 21 7.75v8.5A2.75 2.75 0 0 1 18.25 19zm-.25-2.75c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-7.5H5.5zm2.6-1.1a.75.75 0 0 1-.53-1.28l2.53-2.53a.75.75 0 0 1 .98-.08l1.89 1.42 2.91-3.4a.75.75 0 1 1 1.14.97l-3.38 3.96a.75.75 0 0 1-1.02.1l-1.93-1.45-2.07 2.07a.75.75 0 0 1-.52.22" fill="currentColor"/></svg>`,
-        debt: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8 .75.75 0 0 1 1.5 0 9.5 9.5 0 1 1-2.78-6.72.75.75 0 1 1-1.06 1.06A7.95 7.95 0 0 0 12 4m.75 3.25a.75.75 0 0 0-1.5 0v5c0 .2.08.39.22.53l3.25 3.25a.75.75 0 0 0 1.06-1.06l-3.03-3.03z" fill="currentColor"/></svg>`,
-        slow: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5A8.5 8.5 0 1 0 20.5 12 .75.75 0 0 1 22 12 10 10 0 1 1 12 2a.75.75 0 0 1 0 1.5m.75 3.75a.75.75 0 0 0-1.5 0v5.06c0 .2.08.39.22.53l2.75 2.75a.75.75 0 1 0 1.06-1.06l-2.53-2.53z" fill="currentColor"/></svg>`,
-        stock: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.75 4 7v10l8 4.25L20 17V7zm0 1.7 6.15 3.27L12 11 5.85 7.72zm-6.5 4.58 5.75 3.05v7.16L5.5 16.2zm7.25 10.21v-7.16l5.75-3.05v7.17z" fill="currentColor"/></svg>`,
-        empty: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.75 4h10.5A2.75 2.75 0 0 1 20 6.75v10.5A2.75 2.75 0 0 1 17.25 20H6.75A2.75 2.75 0 0 1 4 17.25V6.75A2.75 2.75 0 0 1 6.75 4m1 4.25a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5zm0 4a.75.75 0 0 0 0 1.5h5.5a.75.75 0 0 0 0-1.5z" fill="currentColor"/></svg>`
+        dashboard: 'bi-grid-1x2-fill',
+        theme: 'bi-circle-half',
+        menu: 'bi-list',
+        lock: 'bi-lock-fill',
+        sales: 'bi-cash-stack',
+        profit: 'bi-graph-up-arrow',
+        month: 'bi-calendar3',
+        avg: 'bi-receipt',
+        alert: 'bi-exclamation-triangle',
+        trend: 'bi-activity',
+        products: 'bi-trophy',
+        chart: 'bi-graph-up',
+        debt: 'bi-cash-coin',
+        slow: 'bi-box-seam',
+        stock: 'bi-box2',
+        empty: 'bi-inbox'
     };
-    return icons[name] || '';
+    return `<i class="bi ${icons[name] || 'bi-circle'}" aria-hidden="true"></i>`;
 };
 
 // ── Utils ──────────────────────────────────────────────────────
@@ -129,15 +125,15 @@ function getDayName() {
 
 // ── Render ─────────────────────────────────────────────────────
 export function renderDashboard() {
-    const lockHistory  = PermissionService.can('history')   ? '' : '🔒 ';
-    const lockOrders   = PermissionService.can('web_orders') ? '' : '🔒 ';
-    const lockSettings = PermissionService.can('settings')  ? '' : '🔒 ';
-    const lockSuppliers= PermissionService.can('suppliers') ? '' : '🔒 ';
+    const lockHistory  = !PermissionService.can('history');
+    const lockOrders   = !PermissionService.can('web_orders');
+    const lockSettings = !PermissionService.can('settings');
+    const lockSuppliers= !PermissionService.can('suppliers');
     const hasHistoryAccess = PermissionService.can('history');
     const chartBlurClass   = hasHistoryAccess ? '' : 'premium-blur-content';
     const chartOverlay     = hasHistoryAccess ? '' : `
         <div class="premium-lock-overlay" onclick="window.checkPlan(event,'history')">
-            <div class="lock-badge">🔒</div>
+            <div class="lock-badge">${icon('lock')}</div>
             <div class="lock-text">Ver Análisis de Ventas</div>
         </div>`;
 
@@ -261,7 +257,24 @@ export function renderDashboard() {
 
         .dashboard-shell .sidebar-menu {
             flex: 1;
+            min-height: 0;
+        }
+
+        .dashboard-shell .sidebar-menu-main {
+            display: flex;
+            flex-direction: column;
             gap: 8px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+
+        .dashboard-shell .sidebar-menu-footer {
+            margin-top: auto;
+            padding-top: 18px;
+            padding-bottom: 6px;
+            border-top: 1px solid rgba(148, 163, 184, 0.12);
         }
 
         .dashboard-shell .menu-item {
@@ -300,7 +313,6 @@ export function renderDashboard() {
         }
 
         .dashboard-shell .menu-item.logout {
-            margin-top: auto;
             color: #b9525d;
             background: rgba(228, 108, 117, 0.08);
             border-color: rgba(228, 108, 117, 0.12);
@@ -333,13 +345,20 @@ export function renderDashboard() {
         }
 
         .menu-icon svg,
+        .menu-icon i,
         .section-icon svg,
+        .section-icon i,
         .metric-icon svg,
+        .metric-icon i,
         .action-icon svg,
-        .state-icon svg {
+        .action-icon i,
+        .state-icon svg,
+        .state-icon i {
             width: 100%;
             height: 100%;
-            display: block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .dashboard-shell .admin-content {
@@ -459,6 +478,20 @@ export function renderDashboard() {
         .action-icon {
             width: 18px;
             height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .metric-icon i,
+        .section-icon i,
+        .action-icon i,
+        .state-icon i {
+            width: 100%;
+            height: 100%;
+            font-size: inherit;
+            line-height: 1;
+            text-align: center;
         }
 
         .dash-topbar {
@@ -533,6 +566,9 @@ export function renderDashboard() {
         .metric-icon {
             width: 20px;
             height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .kpi-label {
@@ -669,7 +705,10 @@ export function renderDashboard() {
             width: 18px;
             height: 18px;
             flex-shrink: 0;
-            margin-top: 1px;
+            margin-top: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .state-card {
@@ -916,10 +955,17 @@ export function renderDashboard() {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
             margin-bottom: 10px;
             background: rgba(255,255,255,.8);
             color: var(--dash-text);
+        }
+
+        .lock-badge i {
+            font-size: 1.2rem;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         .lock-text {
             font-weight: 600;
@@ -1037,21 +1083,18 @@ export function renderDashboard() {
 
         <aside class="admin-sidebar" id="admin-sidebar">
             <div class="sidebar-logo">${renderSidebarHeader()}</div>
-            <nav class="sidebar-menu">
-                <button class="menu-item active" aria-current="page"><span class="menu-icon">${icon('dashboard')}</span><span>Dashboard</span></button>
-                <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event,'web_orders')"><span class="menu-icon">${icon('orders')}</span><span>${lockOrders}Pedidos web</span></button>
-                <button class="menu-item" id="nav-inventory"><span class="menu-icon">${icon('inventory')}</span><span>Inventario</span></button>
-                <button class="menu-item" id="nav-pos"><span class="menu-icon">${icon('pos')}</span><span>Ir a caja</span></button>
-                <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event,'suppliers')"><span class="menu-icon">${icon('suppliers')}</span><span>${lockSuppliers}Estados de cuenta</span></button>
-                <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event,'history')"><span class="menu-icon">${icon('history')}</span><span>${lockHistory}Historial</span></button>
-                <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event,'settings')"><span class="menu-icon">${icon('settings')}</span><span>${lockSettings}Configuración</span></button>
-                <button class="menu-item logout" id="nav-logout"><span class="menu-icon">${icon('logout')}</span><span>Salir</span></button>
-            </nav>
+            ${renderAdminSidebarNav({
+                active: 'dashboard',
+                lockOrders,
+                lockSuppliers,
+                lockHistory,
+                lockSettings
+            })}
         </aside>
 
         <main class="admin-content">
             <div class="dash-topbar">
-                <button class="dash-hamburger" id="mobile-menu-btn" aria-label="Abrir menú"><span class="action-icon">${icon('dashboard')}</span></button>
+                <button class="dash-hamburger" id="mobile-menu-btn" aria-label="Abrir menú"><span class="action-icon">${icon('menu')}</span></button>
                 <span class="dash-topbar-title">Dashboard</span>
                 <div class="dash-topbar-right">
                     <button id="theme-toggle-dash-mobile" class="ghost-action" aria-label="Cambiar tema"><span class="action-icon">${icon('theme')}</span></button>
@@ -1394,10 +1437,10 @@ export async function setupDashboardLogic(router) {
         const stockBajo = (products || []).filter(p => Number(p.stock) > 0 && Number(p.stock) <= 5);
         const ventasHoy = (sales || []).filter(s => new Date(s.date || s.created_at).toDateString() === todayStr);
 
-        if (agotados.length > 0) alertas.push({ tipo: 'critical', icon: '🚫', texto: `${agotados.length} producto${agotados.length > 1 ? 's' : ''} AGOTADO${agotados.length > 1 ? 'S' : ''}: ${agotados.slice(0,2).map(p => p.name).join(', ')}${agotados.length > 2 ? '...' : ''}` });
-        if (stockBajo.length > 0) alertas.push({ tipo: 'warning', icon: '⚠️', texto: `${stockBajo.length} producto${stockBajo.length > 1 ? 's' : ''} con poco stock: ${stockBajo.slice(0,2).map(p => `${p.name} (${p.stock})`).join(', ')}` });
-        if (ventasHoy.length === 0) alertas.push({ tipo: 'warning', icon: '📭', texto: 'Aún no hay ventas registradas hoy.' });
-        if (agotados.length === 0 && stockBajo.length === 0 && ventasHoy.length > 0) alertas.push({ tipo: 'ok', icon: '✅', texto: `¡Todo en orden! Llevas ${ventasHoy.length} venta${ventasHoy.length > 1 ? 's' : ''} hoy.` });
+        if (agotados.length > 0) alertas.push({ tipo: 'critical', texto: `${agotados.length} producto${agotados.length > 1 ? 's' : ''} AGOTADO${agotados.length > 1 ? 'S' : ''}: ${agotados.slice(0,2).map(p => p.name).join(', ')}${agotados.length > 2 ? '...' : ''}` });
+        if (stockBajo.length > 0) alertas.push({ tipo: 'warning', texto: `${stockBajo.length} producto${stockBajo.length > 1 ? 's' : ''} con poco stock: ${stockBajo.slice(0,2).map(p => `${p.name} (${p.stock})`).join(', ')}` });
+        if (ventasHoy.length === 0) alertas.push({ tipo: 'warning', texto: 'Aún no hay ventas registradas hoy.' });
+        if (agotados.length === 0 && stockBajo.length === 0 && ventasHoy.length > 0) alertas.push({ tipo: 'ok', texto: `Todo en orden. Llevas ${ventasHoy.length} venta${ventasHoy.length > 1 ? 's' : ''} hoy.` });
 
         el.innerHTML = alertas.length === 0
             ? `<div class="state-card state-card-success"><span class="state-icon">${icon('alert')}</span><div><strong>Sin alertas por ahora</strong>Todo se ve en orden en tu operación de hoy.</div></div>`

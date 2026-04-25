@@ -2,16 +2,17 @@ import { supabase } from '../../data/supabase.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
 import { PermissionService } from '../../services/permissions.js';
 import { ThemeService } from '../../services/theme.js';
+import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 
 const PAGE_TITLE = "Facturación";
 
 export function renderAdminBilling() {
     // Variables de Bloqueo
-    const lockOrders = PermissionService.can('web_orders') ? '' : '🔒 ';
-    const lockSuppliers = PermissionService.can('suppliers') ? '' : '🔒 ';
-    const lockSettings = PermissionService.can('settings') ? '' : '🔒 ';
-    const lockHistory = PermissionService.can('history') ? '' : '🔒 ';
-    const lockInventory = PermissionService.can('inventory') ? '' : '🔒 ';
+    const lockOrders = !PermissionService.can('web_orders');
+    const lockSuppliers = !PermissionService.can('suppliers');
+    const lockSettings = !PermissionService.can('settings');
+    const lockHistory = !PermissionService.can('history');
+    const lockInventory = !PermissionService.can('inventory');
     
     // Estilos Específicos de Facturación (Sin romper el sidebar)
     const styles = `
@@ -92,31 +93,20 @@ export function renderAdminBilling() {
                 <div class="sidebar-logo">
                     ${renderSidebarHeader()}
                 </div>
-                <nav class="sidebar-menu">
-                    <button class="menu-item" id="nav-dash">📊 Dashboard</button>
-                    <button class="menu-item" id="nav-orders" onclick="window.checkPlan(event, 'web_orders')">
-                        ${lockOrders}🔔 Pedidos Web
-                    </button>
-                    <button class="menu-item" id="nav-inventory">📦 Inventario</button>
-                    <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="window.checkPlan(event, 'suppliers')">
-                        ${lockSuppliers}🚚 Proveedores
-                    </button>
-                     <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
-                        ${lockHistory}📅 Historial
-                    </button>
-                    <button class="menu-item active">💎 Facturación</button>
-                    <button class="menu-item" id="nav-settings" onclick="window.checkPlan(event, 'settings')">
-                        ${lockSettings}⚙️ Configuración
-                    </button>
-                    <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
-                </nav>
+                ${renderAdminSidebarNav({
+                    active: 'billing',
+                    lockOrders,
+                    lockSuppliers,
+                    lockHistory,
+                    lockSettings,
+                    lockBilling: ''
+                })}
             </aside>
 
             <main class="admin-content">
                 <header class="content-header">
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer; display:none;">☰</button>
+                        <button id="mobile-menu-btn" aria-label="Abrir menú" style="background:none; border:none; font-size:1.25rem; color:var(--text-primary); cursor:pointer; display:none;"><i class="bi bi-list"></i></button>
                         <div>
                             <h1>${PAGE_TITLE}</h1>
                             <p style="font-size:0.8rem; color:var(--text-secondary);">Emite comprobantes fiscales (CFDI 4.0) válidos ante el SAT.</p>
@@ -126,8 +116,8 @@ export function renderAdminBilling() {
 
                 <div class="card-panel">
                     <div class="tabs-container">
-                        <button id="tab-emitir" class="tab-btn active">📝 Nueva Factura</button>
-                        <button id="tab-config" class="tab-btn">⚙️ Mis Datos Fiscales</button>
+                        <button id="tab-emitir" class="tab-btn active"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i> Nueva factura</button>
+                        <button id="tab-config" class="tab-btn"><i class="bi bi-gear" aria-hidden="true"></i> Mis datos fiscales</button>
                     </div>
 
                     <div id="view-emitir">
@@ -138,7 +128,7 @@ export function renderAdminBilling() {
                                 <p style="margin:0; font-size:0.85rem; color:var(--text-secondary);">Importar todas las ventas de hoy automáticamente.</p>
                             </div>
                             <button id="btn-load-global" class="btn-primary" style="width:auto; background: #2563eb;">
-                                <span>🔄</span> Cargar Ventas Hoy
+                                <span><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span> Cargar ventas hoy
                             </button>
                         </div>
 
@@ -286,7 +276,7 @@ export function renderAdminBilling() {
                             </div>
                             
                             <button id="btn-save-config" class="btn-primary" style="margin-top:20px;">
-                                💾 Guardar Configuración
+                                <i class="bi bi-floppy" aria-hidden="true"></i> Guardar configuración
                             </button>
                         </div>
                     </div>
@@ -481,7 +471,7 @@ export async function setupBillingLogic(router) {
     document.getElementById('btn-load-global').onclick = async () => {
         const btn = document.getElementById('btn-load-global');
         const originalText = btn.innerHTML;
-        btn.innerHTML = "⏳ Buscando..."; btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i> Buscando...'; btn.disabled = true;
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -600,7 +590,7 @@ export async function setupBillingLogic(router) {
         if(!clienteRfc) return alert("Falta el RFC del cliente.");
         
         const btn = document.getElementById('btn-timbrar');
-        btn.innerHTML = '⏳ Generando...'; btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i> Generando...'; btn.disabled = true;
         
         // Simulación de timbrado
         setTimeout(() => {

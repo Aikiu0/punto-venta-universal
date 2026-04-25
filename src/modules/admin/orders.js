@@ -2,6 +2,7 @@
 import { supabase } from '../../data/supabase.js';
 import { ThemeService } from '../../services/theme.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
+import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 export function renderAdminOrders() {
     return `
         <div class="admin-container">
@@ -10,24 +11,14 @@ export function renderAdminOrders() {
                 <div class="sidebar-logo">
                 ${renderSidebarHeader()}
                 </div>
-                <nav class="sidebar-menu">
-                    <button class="menu-item" id="nav-dash"> Dashboard</button>
-                    <button class="menu-item active"> Pedidos Web</button>
-                    <button class="menu-item" id="nav-inventory"> Inventario</button>
-                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')"> Estados de cuenta</button>
-                    <button class="menu-item" id="nav-history"> Historial</button>
-                    
-                    <button class="menu-item" id="nav-settings"> Configuración</button>
-                    <button class="menu-item logout" id="nav-logout"> Salir</button>
-                </nav>
+                ${renderAdminSidebarNav({ active: 'orders' })}
             </aside>
 
             <main class="admin-content">
                 <header class="content-header">
 
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer;">☰</button>
+                        <button id="mobile-menu-btn" aria-label="Abrir menú" style="background:none; border:none; font-size:1.25rem; color:var(--text-primary); cursor:pointer;"><i class="bi bi-list"></i></button>
                         
                         <div class="page-title">
                             <h1>Pedidos en Línea</h1>
@@ -35,10 +26,10 @@ export function renderAdminOrders() {
                     </div>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <button id="theme-toggle-orders" class="icon-btn" title="Cambiar Tema" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); width:40px; height:40px; border-radius:8px; cursor:pointer; display:flex; justify-content:center; align-items:center;">
-                            🌗
+                            <i class="bi bi-circle-half" aria-hidden="true"></i>
                         </button>
                         
-                        <button id="btn-refresh" class="btn-primary" style="background:var(--brand-color); color:white;">🔄 Actualizar</button>
+                        <button id="btn-refresh" class="btn-primary" style="background:var(--brand-color); color:white;"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Actualizar</button>
                     </div>
                 </header>
 
@@ -110,7 +101,7 @@ export async function setupOrdersLogic(router) {
         if (orders.length === 0) {
             container.innerHTML = `
                 <div style="grid-column:1/-1; text-align:center; padding:50px; background:var(--bg-card); border-radius:12px; border:1px solid var(--border-color);">
-                    <div style="font-size:3rem; margin-bottom:10px;">✅</div>
+                    <div style="font-size:3rem; margin-bottom:10px;"><i class="bi bi-check-circle"></i></div>
                     <h3 style="color:var(--text-primary);">Todo al día</h3>
                     <p style="color:var(--text-secondary);">No hay pedidos pendientes.</p>
                 </div>`;
@@ -151,7 +142,7 @@ export async function setupOrdersLogic(router) {
                     <p style="margin:5px 0;">Número de teléfono: ${order.customer_contact}</p>
                     <p style="margin:5px 0;">Método de pago: ${method.toUpperCase()}</p>
                 </div>
-                <button class="btn-primary btn-deliver" style="width:100%; justify-content:center; background:var(--success-bg); color:white;">✅ Entregar y Cobrar</button>
+                <button class="btn-primary btn-deliver" style="width:100%; justify-content:center; background:var(--success-bg); color:white;"><i class="bi bi-check2-circle" aria-hidden="true"></i> Entregar y Cobrar</button>
             `;
             
             card.querySelector('.btn-deliver').addEventListener('click', () => completeOrder(order));

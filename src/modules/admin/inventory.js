@@ -5,14 +5,15 @@ import { db } from '../../data/db-local.js';
 import { syncService } from '../../services/sync.js';
 import { PermissionService } from '../../services/permissions.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
+import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 let allProducts = [];
 
 export function renderAdminInventory() {
-    const lockHistory = PermissionService.can('history') ? '' : '🔒 ';
-    const lockOrders = PermissionService.can('web_orders') ? '' : '🔒 ';
-    const lockSettings = PermissionService.can('settings') ? '' : '🔒 ';
-    const lockSuppliers = PermissionService.can('suppliers') ? '' : '🔒 ';
-    const lockBilling = PermissionService.can('billing') ? '' : '🔒 ';
+    const lockHistory = !PermissionService.can('history');
+    const lockOrders = !PermissionService.can('web_orders');
+    const lockSettings = !PermissionService.can('settings');
+    const lockSuppliers = !PermissionService.can('suppliers');
+    const lockBilling = !PermissionService.can('billing');
     const canImport = PermissionService.can('import_excel');
     const lockImport = canImport ? '' : '🔒';
     const opacityImport = canImport ? '1' : '0.6';
@@ -29,28 +30,19 @@ export function renderAdminInventory() {
                 <div class="sidebar-logo">
                     ${renderSidebarHeader()}
                 </div>
-                <nav class="sidebar-menu">
-                    <button class="menu-item" id="nav-dash"> Dashboard</button>
-                    <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
-                        ${lockOrders} Pedidos Web
-                    </button>
-                    <button class="menu-item active"> Inventario</button>
-                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Estados de cuenta</button>
-                    <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
-                        ${lockHistory} Historial
-                    </button>
-                    <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event, 'settings')">
-                        ${lockSettings} Configuración
-                    </button>
-                    <button class="menu-item logout" id="nav-logout" style="margin-top:auto; color:var(--danger-color);"> Salir</button>
-                </nav>
+                ${renderAdminSidebarNav({
+                    active: 'inventory',
+                    lockOrders,
+                    lockSuppliers,
+                    lockHistory,
+                    lockSettings
+                })}
             </aside>
 
             <main class="admin-content">
                 <header class="content-header">
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer;">☰</button>
+                        <button id="mobile-menu-btn" aria-label="Abrir menú" style="background:none; border:none; font-size:1.25rem; color:var(--text-primary); cursor:pointer;"><i class="bi bi-list"></i></button>
                         <div class="page-title">
                             <h1>Gestión de Inventario</h1>
                             <p>Administra productos, fotos, costos y precios.</p>
@@ -59,21 +51,21 @@ export function renderAdminInventory() {
                     
                     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                         <button id="theme-toggle-inv" class="icon-btn" title="Cambiar Tema" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); width:40px; height:40px; border-radius:8px; cursor:pointer;">
-                            🌗
+                            <i class="bi bi-circle-half" aria-hidden="true"></i>
                         </button>
                         <input type="file" id="csv-input" accept=".csv" style="display:none;">
                         <button id="btn-import-csv" class="btn-secondary" 
                             style="background:#10b981; color:white; border:none; padding:10px 15px; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:5px; opacity: ${opacityImport};"
                             onclick="if(window.checkPlan(event, 'import_excel')) document.getElementById('csv-input').click();">
-                            ${lockImport} 📥 Importar
+                            ${lockImport ? '<i class="bi bi-lock-fill" aria-hidden="true"></i> ' : ''}<i class="bi bi-download" aria-hidden="true"></i> Importar
                         </button>
                         <button id="btn-export-csv" class="btn-secondary" 
                             style="background:#6366f1; color:white; border:none; padding:10px 15px; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:5px; opacity: ${opacityExport};"
                             onclick="return window.checkPlan(event, 'export_excel')">
-                            ${lockExport} 📤 Exportar
+                            ${lockExport ? '<i class="bi bi-lock-fill" aria-hidden="true"></i> ' : ''}<i class="bi bi-upload" aria-hidden="true"></i> Exportar
                         </button>
                         <button id="btn-add-product" class="btn-primary" style="padding:10px 15px; border-radius:8px;">
-                            <span>+</span> Nuevo
+                            <i class="bi bi-plus-lg" aria-hidden="true"></i> Nuevo
                         </button>
                     </div>
                 </header>
@@ -115,7 +107,7 @@ export function renderAdminInventory() {
                                 <img id="prod-image-preview" src="" style="display:none; width:60px; height:60px; object-fit:cover; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-input);">
                                 <input type="file" id="prod-image" accept="image/*" capture="environment" class="form-input" style="flex:1; padding:8px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:6px; font-size: 0.9rem;">
                             </div>
-                            <span id="upload-status" style="font-size:0.85rem; color:#10b981; font-weight:bold; display:none;">Subiendo imagen... ⏳</span>
+                            <span id="upload-status" style="font-size:0.85rem; color:#10b981; font-weight:bold; display:none;"><i class="bi bi-hourglass-split" aria-hidden="true"></i> Subiendo imagen...</span>
                         </div>
 
                         <input type="text" id="prod-name" placeholder="Nombre del Producto" class="form-input" style="padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:6px;">
@@ -344,7 +336,7 @@ export async function setupInventoryLogic(router) {
 
         products.forEach(p => {
             // Un pequeño icono visual si el producto tiene foto
-            const imgIcon = p.image_url ? ' 🖼️' : '';
+            const imgIcon = p.image_url ? ' <i class="bi bi-image" aria-hidden="true"></i>' : '';
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><b>${p.name}</b>${p.is_bulk ? ' 📏' : ''}${imgIcon}</td>
@@ -353,8 +345,8 @@ export async function setupInventoryLogic(router) {
                 <td style="font-weight:bold; color:var(--success-bg);">$${p.price.toFixed(2)}</td>
                 <td>${p.stock} <small>${p.unit||'pz'}</small></td>
                 <td>
-                    <button class="action-btn edit-btn" data-id="${p.id}">✏️</button>
-                    <button class="action-btn delete-btn" data-id="${p.id}">🗑️</button>
+                    <button class="action-btn edit-btn" data-id="${p.id}" title="Editar"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
+                    <button class="action-btn delete-btn" data-id="${p.id}" title="Eliminar"><i class="bi bi-trash3" aria-hidden="true"></i></button>
                 </td>
             `;
             tableBody.appendChild(tr);

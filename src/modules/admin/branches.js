@@ -8,12 +8,13 @@ import { BranchService } from '../../services/branchService.js';
 import { PermissionService } from '../../services/permissions.js';
 import { ThemeService } from '../../services/theme.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
+import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 
 export function renderBranches() {
-    const lockOrders   = PermissionService.can('web_orders')  ? '' : '🔒 ';
-    const lockHistory  = PermissionService.can('history')     ? '' : '🔒 ';
-    const lockSettings = PermissionService.can('settings')    ? '' : '🔒 ';
-    const lockSuppliers= PermissionService.can('suppliers')   ? '' : '🔒 ';
+    const lockOrders   = !PermissionService.can('web_orders');
+    const lockHistory  = !PermissionService.can('history');
+    const lockSettings = !PermissionService.can('settings');
+    const lockSuppliers= !PermissionService.can('suppliers');
 
     return `
     <style>
@@ -121,32 +122,29 @@ export function renderBranches() {
         <div class="sidebar-overlay" id="sidebar-overlay"></div>
         <aside class="admin-sidebar" id="admin-sidebar">
             <div class="sidebar-logo">${renderSidebarHeader()}</div>
-            <nav class="sidebar-menu">
-                <button class="menu-item" id="nav-dash">📊 Dashboard</button>
-                <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event,'web_orders')">${lockOrders}🔔 Pedidos Web</button>
-                <button class="menu-item" id="nav-inventory">📦 Inventario</button>
-                <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event,'suppliers')">${lockSuppliers}🚚 Proveedores</button>
-                <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event,'history')">${lockHistory}📅 Historial</button>
-                <button class="menu-item active">🏪 Sucursales</button>
-                <button class="menu-item" id="nav-transfers">🔄 Traspasos</button>
-                <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event,'settings')">${lockSettings}⚙️ Configuración</button>
-                <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
-            </nav>
+            ${renderAdminSidebarNav({
+                active: 'branches',
+                lockOrders,
+                lockSuppliers,
+                lockHistory,
+                lockSettings,
+                includeBranches: true,
+                includeTransfers: true
+            })}
         </aside>
 
         <main class="admin-content">
             <header class="content-header">
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <button id="mobile-menu-btn" style="background:none;border:none;font-size:1.8rem;color:var(--text-primary);cursor:pointer;">☰</button>
+                    <button id="mobile-menu-btn" aria-label="Abrir menú" style="background:none;border:none;font-size:1.25rem;color:var(--text-primary);cursor:pointer;"><i class="bi bi-list"></i></button>
                     <div class="page-title">
-                        <h1>🏪 Sucursales</h1>
+                        <h1><i class="bi bi-shop" aria-hidden="true"></i> Sucursales</h1>
                         <p>Gestiona todas tus ubicaciones, personal y métricas por sucursal.</p>
                     </div>
                 </div>
                 <div style="display:flex;gap:10px;align-items:center;">
-                    <button id="theme-toggle-branches" class="icon-btn" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);width:40px;height:40px;border-radius:8px;cursor:pointer;">🌗</button>
-                    <button id="btn-add-branch" class="btn-primary">+ Nueva Sucursal</button>
+                    <button id="theme-toggle-branches" class="icon-btn" aria-label="Cambiar tema" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);width:40px;height:40px;border-radius:8px;cursor:pointer;"><i class="bi bi-circle-half"></i></button>
+                    <button id="btn-add-branch" class="btn-primary"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nueva sucursal</button>
                 </div>
             </header>
 
@@ -450,7 +448,7 @@ export async function setupBranchesLogic(router) {
             if (branches.length === 0) {
                 grid.innerHTML = `
                     <div class="add-branch-card" id="empty-add-card">
-                        <div class="add-branch-icon">🏪</div>
+                        <div class="add-branch-icon"><i class="bi bi-shop"></i></div>
                         <div class="add-branch-label">Crear primera sucursal</div>
                         <div style="font-size:0.82rem;">Tu negocio aún no tiene sucursales configuradas.</div>
                     </div>`;
@@ -489,15 +487,15 @@ export async function setupBranchesLogic(router) {
                             </div>
                         </div>
                         <div class="branch-actions">
-                            <button class="btn-branch-action" data-id="${branch.id}" data-action="edit">✏️ Editar</button>
-                            <button class="btn-branch-action" data-id="${branch.id}" data-action="staff">👥 Personal</button>
-                            <button class="btn-branch-action danger" data-id="${branch.id}" data-action="deactivate">🗑</button>
+                            <button class="btn-branch-action" data-id="${branch.id}" data-action="edit"><i class="bi bi-pencil-square" aria-hidden="true"></i> Editar</button>
+                            <button class="btn-branch-action" data-id="${branch.id}" data-action="staff"><i class="bi bi-people" aria-hidden="true"></i> Personal</button>
+                            <button class="btn-branch-action danger" data-id="${branch.id}" data-action="deactivate"><i class="bi bi-trash3" aria-hidden="true"></i></button>
                         </div>
                     </div>
                 </div>`;
             }).join('') + `
             <div class="add-branch-card" id="add-branch-card-bottom">
-                <div class="add-branch-icon">+</div>
+                <div class="add-branch-icon"><i class="bi bi-plus-lg"></i></div>
                 <div class="add-branch-label">Agregar sucursal</div>
             </div>`;
 

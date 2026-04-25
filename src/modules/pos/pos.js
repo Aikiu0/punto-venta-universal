@@ -51,8 +51,8 @@ export function renderPOS() {
                 <div class="catalog-header">
                     <div class="search-wrapper"><span class="search-icon"></span><input type="text" id="search" class="search-input" placeholder="Buscar producto..." autocomplete="off"></div>
                     <div style="display:flex; gap:5px;">
-                        <button id="btn-view-list" class="view-btn active" title="Lista">☰</button>
-                        <button id="btn-view-grid" class="view-btn" title="Cuadrícula">田</button>
+                        <button id="btn-view-list" class="view-btn active" title="Lista" aria-label="Vista de lista"><i class="bi bi-list"></i></button>
+                        <button id="btn-view-grid" class="view-btn" title="Cuadrícula" aria-label="Vista de cuadrícula"><i class="bi bi-grid-3x3-gap-fill"></i></button>
                     </div>
                 </div>
                 <div id="product-container" class="products-grid list-mode"></div>
@@ -62,14 +62,14 @@ export function renderPOS() {
                 <div class="cart-header">
                     <div class="cart-title">Ticket</div>
                     <div class="header-actions">
-                        <button id="pos-theme-toggle" class="icon-btn" title="Cambiar Tema">🌗</button>
+                        <button id="pos-theme-toggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema"><i class="bi bi-circle-half"></i></button>
                         <div style="position:relative;">
-                            <button id="btn-web-orders" title="Pedidos Web" style="border:none; background:var(--bg-input); color:var(--text-secondary); border-radius:8px; width:42px; height:38px; cursor:pointer; font-size:1.3rem; display:flex; align-items:center; justify-content:center;">🔔</button>
+                            <button id="btn-web-orders" title="Pedidos web" aria-label="Pedidos web" style="border:none; background:var(--bg-input); color:var(--text-secondary); border-radius:8px; width:42px; height:38px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center;"><i class="bi bi-bag-fill"></i></button>
                             <div id="orders-badge" style="position:absolute; top:-5px; right:-5px; background:#ef4444; color:white; border-radius:50%; width:20px; height:20px; font-size:0.75rem; font-weight:bold; display:none; justify-content:center; align-items:center; box-shadow:0 2px 5px rgba(0,0,0,0.2); z-index:10;">0</div>
                         </div>
                         <div id="connection-status" style="display:flex; align-items:center; gap:6px; padding:6px 12px; background:var(--bg-input); border-radius:20px; font-size:0.8rem; font-weight:bold; transition:all 0.3s; border:1px solid transparent;"><span>...</span></div>
-                        <button id="btn-sync" class="icon-btn" title="Forzar Sincronización">🔄</button>
-                        <button id="logout-btn" class="icon-btn" style="color:var(--danger-color);">⏻</button>
+                        <button id="btn-sync" class="icon-btn" title="Forzar sincronización" aria-label="Forzar sincronización"><i class="bi bi-arrow-repeat"></i></button>
+                        <button id="logout-btn" class="icon-btn" aria-label="Salir" style="color:var(--danger-color);"><i class="bi bi-box-arrow-right"></i></button>
                     </div>
                 </div>
                 <div class="cart-items" id="cart-items"><p style="text-align:center;color:var(--text-secondary);margin-top:50px">Vacío</p></div>
@@ -82,7 +82,7 @@ export function renderPOS() {
             <div class="modal-overlay" id="payment-modal"><div class="modal-card" id="modal-content"></div></div>
             
             <div id="toast-notification" style="position:fixed; top:20px; right:20px; background:var(--bg-card); color:var(--text-primary); padding:20px; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,0.5); display:none; align-items:center; gap:15px; z-index:2147483647; border-left: 6px solid var(--success-bg); width: 300px; cursor:pointer; animation: slideIn 0.3s; border: 1px solid var(--border-color);">
-                <div style="font-size:2rem;">🔔</div>
+                <div style="font-size:2rem;"><i class="bi bi-bag-fill"></i></div>
                 <div>
                     <div style="font-weight:bold; font-size:1.1rem; margin-bottom:5px;">¡NUEVO PEDIDO!</div>
                     <div id="toast-msg" style="color:var(--text-secondary); font-size:0.9rem;">Cliente...</div>
@@ -113,7 +113,7 @@ export async function setupPOSLogic(router) {
         if (isSyncing || !navigator.onLine) return;
         isSyncing = true;
         const btn = document.getElementById('btn-sync');
-        if(btn) btn.innerHTML = "⏳";
+        if(btn) btn.innerHTML = '<i class="bi bi-arrow-repeat spin" aria-hidden="true"></i>';
 
         try {
             await syncService.uploadSales();
@@ -126,7 +126,7 @@ export async function setupPOSLogic(router) {
             console.error("Sync error:", e);
         } finally {
             isSyncing = false;
-            if(btn) btn.innerHTML = "🔄";
+            if(btn) btn.innerHTML = '<i class="bi bi-arrow-repeat" aria-hidden="true"></i>';
         }
     }
 
@@ -236,7 +236,7 @@ export async function setupPOSLogic(router) {
         const { data: orders } = await supabase.from('web_orders').select('*').eq('status', 'pendiente').eq('business_id', businessId).order('created_at', {ascending:false});
 
         if (!orders || orders.length === 0) {
-            modalContent.innerHTML = `<div style="text-align:center; padding:30px;"><h3 style="color:var(--text-primary);">✅ Todo al día</h3><button id="btn-close-modal" style="margin-top:15px; padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:5px; cursor:pointer;">Cerrar</button></div>`;
+            modalContent.innerHTML = `<div style="text-align:center; padding:30px;"><h3 style="color:var(--text-primary);"><i class="bi bi-check-circle" aria-hidden="true"></i> Todo al día</h3><button id="btn-close-modal" style="margin-top:15px; padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:5px; cursor:pointer;">Cerrar</button></div>`;
             document.getElementById('btn-close-modal').addEventListener('click', () => modal.style.display = 'none');
             checkPendingOrders(); 
             return;
@@ -248,13 +248,13 @@ export async function setupPOSLogic(router) {
             return `
                 <div style="border:1px solid var(--border-color); padding:15px; margin-bottom:10px; border-radius:8px; border-left:4px solid var(--brand-color); text-align:left; background:var(--bg-card);">
                     <div style="display:flex; justify-content:space-between; font-weight:bold;"><span style="color:var(--text-primary);">${o.customer_name}</span><span style="color:var(--success-bg);">$${o.total.toFixed(2)}</span></div>
-                    <div style="font-size:0.85rem; color:var(--text-secondary); margin:5px 0;">Pago: <strong>${method}</strong> | 📞 ${o.customer_contact}</div>
+                    <div style="font-size:0.85rem; color:var(--text-secondary); margin:5px 0;">Pago: <strong>${method}</strong> | <i class="bi bi-telephone" aria-hidden="true"></i> ${o.customer_contact}</div>
                     <div style="background:var(--bg-input); color:var(--text-primary); padding:10px; border-radius:5px; margin:10px 0;"><ul style="padding-left:20px; margin:0;">
                         ${itemsReales.map(i => `<li>${i.qty || i.cantidad} ${i.unit||'pz'} - ${i.name}</li>`).join('')}
                     </ul></div>
                     <div style="display:flex; gap:10px;">
-                         <button class="btn-cancel-order" data-id="${o.id}" style="flex:1; padding:10px; background:var(--danger-color); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">❌ Cancelar</button>
-                         <button class="btn-deliver-order" data-id="${o.id}" style="flex:2; padding:10px; background:var(--success-bg); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">✅ Entregar y Cobrar</button>
+                         <button class="btn-cancel-order" data-id="${o.id}" style="flex:1; padding:10px; background:var(--danger-color); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;"><i class="bi bi-x-circle" aria-hidden="true"></i> Cancelar</button>
+                         <button class="btn-deliver-order" data-id="${o.id}" style="flex:2; padding:10px; background:var(--success-bg); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;"><i class="bi bi-check2-circle" aria-hidden="true"></i> Entregar y Cobrar</button>
                     </div>
                 </div>`;
         }).join('');
@@ -358,7 +358,7 @@ export async function setupPOSLogic(router) {
     
     document.getElementById('btn-sync').addEventListener('click', async () => { 
         const btn = document.getElementById('btn-sync'); 
-        btn.innerHTML = "⏳"; await safeSync(); btn.innerHTML = "🔄"; 
+        btn.innerHTML = '<i class="bi bi-arrow-repeat spin" aria-hidden="true"></i>'; await safeSync(); btn.innerHTML = '<i class="bi bi-arrow-repeat" aria-hidden="true"></i>'; 
     });
     
     document.getElementById('logout-btn').addEventListener('click', async () => { 
@@ -389,7 +389,7 @@ export async function setupPOSLogic(router) {
 
     function renderGrid(products) {
         container.innerHTML = '';
-        if(products.length === 0) { container.innerHTML = `<div style="text-align:center; padding:20px; width:100%; color:var(--text-secondary);">No hay productos. Sincroniza 🔄</div>`; return; }
+        if(products.length === 0) { container.innerHTML = `<div style="text-align:center; padding:20px; width:100%; color:var(--text-secondary);">No hay productos. Sincroniza <i class="bi bi-arrow-repeat" aria-hidden="true"></i></div>`; return; }
 
         products.forEach(p => {
             const card = document.createElement('div'); card.className = 'product-card';
@@ -443,7 +443,7 @@ export async function setupPOSLogic(router) {
     
     function renderCart() {
         cartItemsContainer.innerHTML = ''; totalVenta = 0;
-        if(carrito.length===0) { cartItemsContainer.innerHTML = `<div style="text-align:center;color:var(--text-secondary);margin-top:50px"><div style="font-size:3rem">🛒</div><p>Vacío</p></div>`; cartTotalLabel.textContent='$0.00'; return; }
+        if(carrito.length===0) { cartItemsContainer.innerHTML = `<div style="text-align:center;color:var(--text-secondary);margin-top:50px"><div style="font-size:3rem"><i class="bi bi-cart3"></i></div><p>Vacío</p></div>`; cartTotalLabel.textContent='$0.00'; return; }
         carrito.forEach((item, idx) => {
             totalVenta += item.price * item.cantidad;
             const unit = item.unit || 'pz';
@@ -700,7 +700,7 @@ export async function setupPOSLogic(router) {
                 </div>
             </div>
             <div class="no-print" style="flex-shrink: 0; margin-top:15px; display:flex; gap:10px; flex-direction:column;">
-                <button onclick="window.print()" class="pay-btn-large" style="padding:15px; font-size:1.1rem; background: var(--text-primary); color: var(--bg-card); border-radius:8px; border:none; cursor:pointer;">🖨️ Imprimir Ticket</button>
+                <button onclick="window.print()" class="pay-btn-large" style="padding:15px; font-size:1.1rem; background: var(--text-primary); color: var(--bg-card); border-radius:8px; border:none; cursor:pointer;"><i class="bi bi-printer" aria-hidden="true"></i> Imprimir ticket</button>
                 <button id="close-ticket" style="padding:12px; border:1px solid var(--border-color); background:transparent; color:var(--text-secondary); border-radius:8px; cursor:pointer; font-weight:bold;">Cerrar</button>
             </div>
         `;

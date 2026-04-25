@@ -4,14 +4,15 @@ import { SettingsService } from '../../services/settings.js';
 import { PermissionService } from '../../services/permissions.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
 import { PwaService } from '../../services/pwa.js';
+import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 export function renderAdminSettings() {
     const s = SettingsService.get();
 
     // 1. Candados de Upselling para el menú lateral
-    const lockHistory = PermissionService.can('history') ? '' : '🔒 ';
-    const lockOrders = PermissionService.can('web_orders') ? '' : '🔒 ';
-    const lockSuppliers = PermissionService.can('suppliers') ? '' : '🔒 ';
-    const lockBilling = PermissionService.can('billing') ? '' : '🔒 ';
+    const lockHistory = !PermissionService.can('history');
+    const lockOrders = !PermissionService.can('web_orders');
+    const lockSuppliers = !PermissionService.can('suppliers');
+    const lockBilling = !PermissionService.can('billing');
     // Usamos s.name y s.logo_url con valores por defecto para evitar errores visuales
     const logoUrl = s.logo_url || '';
     const name = s.name || s.name || 'Mi Negocio';
@@ -23,27 +24,17 @@ export function renderAdminSettings() {
                 <div class="sidebar-logo">
                     ${renderSidebarHeader()}
                 </div>
-                <nav class="sidebar-menu" id="sidebar-menu-nav">
-                    <button class="menu-item" id="nav-dash"> Dashboard</button>
-                    
-                    <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
-                        ${lockOrders} Pedidos Web
-                    </button>
-                    
-                    <button class="menu-item" id="nav-inventory"> Inventario</button>
-                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Estados de cuenta</button>
-                    <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event, 'history')">
-                        ${lockHistory} Historial
-                    </button>
-                    <button class="menu-item active"> Configuración</button>
-                    <button class="menu-item logout" id="nav-logout"> Salir</button>
-                </nav>
+                ${renderAdminSidebarNav({
+                    active: 'settings',
+                    lockOrders,
+                    lockSuppliers,
+                    lockHistory
+                })}
             </aside>
             <main class="admin-content">
                 <header class="content-header">
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer;">☰</button>
+                        <button id="mobile-menu-btn" aria-label="Abrir menú" style="background:none; border:none; font-size:1.25rem; color:var(--text-primary); cursor:pointer;"><i class="bi bi-list"></i></button>
                         
                         <div class="page-title">
                             <h1>Configuración</h1>
@@ -77,7 +68,7 @@ export function renderAdminSettings() {
                     <textarea id="set-footer" class="form-input" rows="3" placeholder="Ej: No devoluciones. Gracias por su compra." style="width:100%; padding:10px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); resize:vertical;">${footer}</textarea>
                     
 
-                    <button id="btn-save-settings" class="btn-primary" style="width:100%; margin-top:20px; justify-content:center;">💾 Guardar Cambios</button>
+                    <button id="btn-save-settings" class="btn-primary" style="width:100%; margin-top:20px; justify-content:center;"><i class="bi bi-floppy" aria-hidden="true"></i> Guardar cambios</button>
                 </div>
             </main>
         </div>
@@ -232,7 +223,7 @@ export function setupSettingsLogic(router) {
     if(btnSave) {
         btnSave.addEventListener('click', async () => {
             btnSave.disabled = true; 
-            btnSave.textContent = "⏳ Guardando...";
+            btnSave.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i> Guardando...';
             const footerIn = document.getElementById('set-footer');
             try {
                 const { data: { user } } = await supabase.auth.getUser();
@@ -295,7 +286,7 @@ export function setupSettingsLogic(router) {
                 alert("Error: " + err.message);
             } finally {
                 btnSave.disabled = false; 
-                btnSave.textContent = "💾 Guardar Cambios";
+                btnSave.innerHTML = '<i class="bi bi-floppy" aria-hidden="true"></i> Guardar cambios';
             }
         });
     }
@@ -304,7 +295,7 @@ export function setupSettingsLogic(router) {
         updateBtn.disabled = true;
         updateBtn.style.opacity = '.5';
         updateBtn.style.cursor = 'not-allowed';
-        updateBtn.textContent = '✅ Sistema actualizado';
+        updateBtn.innerHTML = '<i class="bi bi-check-circle" aria-hidden="true"></i> Sistema actualizado';
     };
 
     const setUpdatable = () => {
@@ -313,7 +304,7 @@ export function setupSettingsLogic(router) {
         updateBtn.style.cursor = 'pointer';
         updateBtn.classList.remove('btn-secondary');
         updateBtn.classList.add('btn-primary');
-        updateBtn.textContent = '🔄 Actualizar sistema';
+        updateBtn.innerHTML = '<i class="bi bi-arrow-repeat" aria-hidden="true"></i> Actualizar sistema';
     };
 
     // Estado inicial
@@ -327,7 +318,7 @@ export function setupSettingsLogic(router) {
 
     updateBtn.addEventListener('click', () => {
         if (!PwaService.updateAvailable) return;
-        updateBtn.textContent = '⏳ Actualizando...';
+        updateBtn.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i> Actualizando...';
         PwaService.applyUpdate();
     });
 

@@ -8,6 +8,7 @@ import { BranchService } from '../../services/branchService.js';
 import { PermissionService } from '../../services/permissions.js';
 import { ThemeService } from '../../services/theme.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
+import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 
 // ── Helpers ───────────────────────────────────────────────────
 const fmt = (n) => Number(n || 0).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
@@ -28,10 +29,10 @@ function statusBadge(status) {
 
 // ── Render ─────────────────────────────────────────────────────
 export function renderTransfers() {
-    const lockOrders   = PermissionService.can('web_orders')  ? '' : '🔒 ';
-    const lockHistory  = PermissionService.can('history')     ? '' : '🔒 ';
-    const lockSettings = PermissionService.can('settings')    ? '' : '🔒 ';
-    const lockSuppliers= PermissionService.can('suppliers')   ? '' : '🔒 ';
+    const lockOrders   = !PermissionService.can('web_orders');
+    const lockHistory  = !PermissionService.can('history');
+    const lockSettings = !PermissionService.can('settings');
+    const lockSuppliers= !PermissionService.can('suppliers');
 
     return `
     <style>
@@ -235,30 +236,27 @@ export function renderTransfers() {
         <div class="sidebar-overlay" id="sidebar-overlay"></div>
         <aside class="admin-sidebar" id="admin-sidebar">
             <div class="sidebar-logo">${renderSidebarHeader()}</div>
-            <nav class="sidebar-menu">
-                <button class="menu-item" id="nav-dash">📊 Dashboard</button>
-                <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event,'web_orders')">${lockOrders}🔔 Pedidos Web</button>
-                <button class="menu-item" id="nav-inventory">📦 Inventario</button>
-                <button class="menu-item" id="nav-pos">🛒 Ir a Caja</button>
-                <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event,'suppliers')">${lockSuppliers}🚚 Proveedores</button>
-                <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event,'history')">${lockHistory}📅 Historial</button>
-                <button class="menu-item" id="nav-branches">🏪 Sucursales</button>
-                <button class="menu-item active">🔄 Traspasos</button>
-                <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event,'settings')">${lockSettings}⚙️ Configuración</button>
-                <button class="menu-item logout" id="nav-logout">🚪 Salir</button>
-            </nav>
+            ${renderAdminSidebarNav({
+                active: 'transfers',
+                lockOrders,
+                lockSuppliers,
+                lockHistory,
+                lockSettings,
+                includeBranches: true,
+                includeTransfers: true
+            })}
         </aside>
 
         <main class="admin-content">
             <header class="content-header">
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <button id="mobile-menu-btn" style="background:none;border:none;font-size:1.8rem;color:var(--text-primary);cursor:pointer;">☰</button>
+                    <button id="mobile-menu-btn" aria-label="Abrir menú" style="background:none;border:none;font-size:1.25rem;color:var(--text-primary);cursor:pointer;"><i class="bi bi-list"></i></button>
                     <div class="page-title">
-                        <h1>🔄 Traspasos de Stock</h1>
+                        <h1><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Traspasos de stock</h1>
                         <p>Mueve mercancía entre sucursales de forma controlada.</p>
                     </div>
                 </div>
-                <button id="theme-toggle-tr" class="icon-btn" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);width:40px;height:40px;border-radius:8px;cursor:pointer;">🌗</button>
+                <button id="theme-toggle-tr" class="icon-btn" aria-label="Cambiar tema" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);width:40px;height:40px;border-radius:8px;cursor:pointer;"><i class="bi bi-circle-half"></i></button>
             </header>
 
             <!-- KPIs -->
@@ -283,7 +281,7 @@ export function renderTransfers() {
 
             <!-- Formulario nuevo traspaso -->
             <div class="new-transfer-panel">
-                <h3 class="nt-title">➕ Solicitar nuevo traspaso</h3>
+                <h3 class="nt-title"><i class="bi bi-plus-lg" aria-hidden="true"></i> Solicitar nuevo traspaso</h3>
 
                 <div class="nt-grid">
                     <div>
@@ -354,7 +352,7 @@ export function renderTransfers() {
 
                 <div id="transfers-list">
                     <div class="empty-state">
-                        <div class="empty-icon">⏳</div>
+                        <div class="empty-icon"><i class="bi bi-hourglass-split"></i></div>
                         <p>Cargando traspasos...</p>
                     </div>
                 </div>
@@ -480,7 +478,7 @@ export async function setupTransfersLogic(router) {
                 document.getElementById('tr-product-id').value   = selectedProduct.id;
                 document.getElementById('tr-product-name').value = selectedProduct.name;
                 resultsBox.style.display = 'none';
-                stockPreview.textContent = `📦 Stock disponible en origen: ${selectedProduct.stock} ${selectedProduct.unit || 'pz'}`;
+                stockPreview.innerHTML = `<i class="bi bi-box-seam" aria-hidden="true"></i> Stock disponible en origen: ${selectedProduct.stock} ${selectedProduct.unit || 'pz'}`;
                 stockPreview.classList.add('visible');
                 document.getElementById('tr-qty').focus();
             });
@@ -579,7 +577,7 @@ export async function setupTransfersLogic(router) {
         } catch (err) {
             document.getElementById('transfers-list').innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-icon">⚠️</div>
+                    <div class="empty-icon"><i class="bi bi-exclamation-triangle"></i></div>
                     <p>Error al cargar traspasos: ${err.message}</p>
                 </div>`;
         }
@@ -615,7 +613,7 @@ export async function setupTransfersLogic(router) {
         if (filtered.length === 0) {
             list.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-icon">📭</div>
+                    <div class="empty-icon"><i class="bi bi-inbox"></i></div>
                     <p>${activeFilter === 'all'
                         ? 'No hay traspasos registrados todavía.'
                         : `No hay traspasos con estado "${STATUS_LABEL[activeFilter]?.label || activeFilter}".`}
@@ -649,14 +647,14 @@ export async function setupTransfersLogic(router) {
                 // El encargado de origen puede despachar
                 const isOriginBranch = !myBranchId || t.from_branch_id === myBranchId;
                 if (isOriginBranch) {
-                    actionHtml += `<button class="action-btn-tr btn-dispatch" data-id="${t.id}" data-action="dispatch">📦 Despachar</button>`;
+                    actionHtml += `<button class="action-btn-tr btn-dispatch" data-id="${t.id}" data-action="dispatch"><i class="bi bi-box-seam" aria-hidden="true"></i> Despachar</button>`;
                 }
                 actionHtml += `<button class="action-btn-tr btn-cancel-tr" data-id="${t.id}" data-action="cancel">✕</button>`;
             } else if (t.status === 'in_transit') {
                 // El encargado de destino puede confirmar recepción
                 const isDestBranch = !myBranchId || t.to_branch_id === myBranchId;
                 if (isDestBranch || isOwner) {
-                    actionHtml += `<button class="action-btn-tr btn-receive" data-id="${t.id}" data-action="receive">✅ Recibido</button>`;
+                    actionHtml += `<button class="action-btn-tr btn-receive" data-id="${t.id}" data-action="receive"><i class="bi bi-check2-circle" aria-hidden="true"></i> Recibido</button>`;
                 }
             }
 
@@ -707,13 +705,13 @@ export async function setupTransfersLogic(router) {
                     if (!confirm(`¿Confirmar despacho? Se registrará que la mercancía ya salió de ${transfer.from_branch?.name}.`)) return;
                     btn.disabled = true; btn.textContent = '...';
                     const result = await BranchService.dispatchTransfer(id);
-                    if (!result.success) { alert('Error: ' + result.message); btn.disabled = false; btn.textContent = '📦 Despachar'; return; }
+                    if (!result.success) { alert('Error: ' + result.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-box-seam" aria-hidden="true"></i> Despachar'; return; }
 
                 } else if (action === 'receive') {
                     if (!confirm(`¿Confirmar recepción? El stock de ${transfer.to_branch?.name} se actualizará automáticamente.`)) return;
                     btn.disabled = true; btn.textContent = '...';
                     const result = await BranchService.receiveTransfer(id);
-                    if (!result.success) { alert('Error: ' + result.message); btn.disabled = false; btn.textContent = '✅ Recibido'; return; }
+                    if (!result.success) { alert('Error: ' + result.message); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check2-circle" aria-hidden="true"></i> Recibido'; return; }
 
                 } else if (action === 'cancel') {
                     if (!confirm('¿Cancelar este traspaso?')) return;

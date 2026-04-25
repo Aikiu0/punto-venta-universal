@@ -11,7 +11,7 @@ export function renderShop() {
         <div id="shop-root" class="shop-layout">
             <div class="loading-screen" style="height:100vh; display:flex; align-items:center; justify-content:center; color:#64748b;">
                 <div style="text-align:center;">
-                    <div style="font-size:3rem; margin-bottom:10px;">🏪</div>
+                    <div style="font-size:3rem; margin-bottom:10px;"><i class="bi bi-shop"></i></div>
                     <h2>Cargando Tienda...</h2>
                 </div>
             </div>
@@ -51,7 +51,7 @@ function renderStoreUI(business) {
         <div class="shop-layout">
             <header class="shop-header">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    ${logo ? `<img src="${logo}" style="height: 40px; width:40px; border-radius: 8px; object-fit:cover;">` : '<span style="font-size:2rem;">🏪</span>'}
+                    ${logo ? `<img src="${logo}" style="height: 40px; width:40px; border-radius: 8px; object-fit:cover;">` : '<span style="font-size:2rem;"><i class="bi bi-shop"></i></span>'}
                     <div>
                         <a href="#/shop?s=${business.slug}" style="text-decoration: none; color: #1e293b; font-weight: 800; font-size: 1.1rem; line-height:1.2; display:block;">${name}</a>
                         <a href="#/shop" style="font-size:0.8rem; color:#64748b; text-decoration:none; font-weight:600;">← Volver al directorio</a>
@@ -59,7 +59,7 @@ function renderStoreUI(business) {
                 </div>
                 <nav class="shop-nav">
                     <button id="btn-open-cart" class="btn-cart-float" style="background:${color}">
-                        🛒
+                        <i class="bi bi-cart3" aria-hidden="true"></i>
                         <span id="cart-count" class="cart-badge">0</span>
                     </button>
                 </nav>
@@ -129,14 +129,14 @@ export async function setupShopLogic(router) {
         
         function renderStoreCards(list) {
             if(!list || list.length === 0) {
-                return grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px; color:rgba(255,255,255,0.7);"><h3>😕 No se encontraron tiendas</h3></div>`;
+                return grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px; color:rgba(255,255,255,0.7);"><h3><i class="bi bi-search"></i> No se encontraron tiendas</h3></div>`;
             }
             grid.innerHTML = list.map(s => `
                 <div class="store-card" onclick="window.location.hash='#/shop?s=${s.slug}'; location.reload();">
                     <div class="store-card-header" style="background:${s.primary_color || '#7A3F9D'};"></div>
                     <div class="store-card-body">
                         <div class="store-logo-wrapper">
-                            ${s.logo_url ? `<img src="${s.logo_url}" class="store-logo-img">` : `<span class="store-placeholder">🏪</span>`}
+                            ${s.logo_url ? `<img src="${s.logo_url}" class="store-logo-img">` : `<span class="store-placeholder"><i class="bi bi-shop"></i></span>`}
                         </div>
                         <h3 class="store-name">${s.name}</h3>
                         <span class="store-link">Ver Catálogo &rarr;</span>
@@ -174,7 +174,7 @@ export async function setupShopLogic(router) {
     }
 
     function renderError(msg) {
-        root.innerHTML = `<div style="text-align:center; padding:50px;"><h2>🚫</h2><p>${msg}</p><a href="#/shop">Volver</a></div>`;
+        root.innerHTML = `<div style="text-align:center; padding:50px;"><h2><i class="bi bi-slash-circle"></i></h2><p>${msg}</p><a href="#/shop">Volver</a></div>`;
     }
 
     async function loadCatalog(businessId) {
@@ -252,7 +252,7 @@ export async function setupShopLogic(router) {
             // Evaluamos si el producto tiene un link en image_url
             const imageElement = p.image_url 
                 ? `<img src="${p.image_url}" alt="${p.name}" style="width:100%; height:160px; object-fit:cover; border-radius:12px 12px 0 0;">` 
-                : `<div style="height:160px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:3rem; border-radius:12px 12px 0 0;">📦</div>`;
+                : `<div style="height:160px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:3rem; border-radius:12px 12px 0 0;"><i class="bi bi-box-seam"></i></div>`;
 
             // CORRECCIÓN: Se inyecta imageElement en lugar del div hardcodeado
             card.innerHTML = `
@@ -414,7 +414,7 @@ export async function setupShopLogic(router) {
             const cartBody = document.getElementById('cart-body');
             cartBody.innerHTML = `
                 <div style="text-align:center; padding:40px 20px;">
-                    <div style="font-size:4rem; margin-bottom:10px;">✅</div>
+                    <div style="font-size:4rem; margin-bottom:10px;"><i class="bi bi-check-circle"></i></div>
                     <h2 style="margin-bottom:10px;">¡Listo!</h2>
                     <p>Tu pedido ha sido recibido en <strong>${currentBusiness.name}</strong>.</p>
                     <button id="btn-finish" style="width:100%; padding:15px; background:#1e293b; color:white; border:none; border-radius:10px; font-weight:bold; margin-top:20px;">Cerrar</button>

@@ -5,6 +5,7 @@ import { ThemeService } from '../../services/theme.js';
 import { SettingsService } from '../../services/settings.js';
 import { PermissionService } from '../../services/permissions.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
+import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 
 // --- ESTILOS CSS (Optimizado para evitar duplicados) ---
 const styles = `
@@ -146,7 +147,7 @@ export function renderHistory() {
     const headerHTML = `
         <header class="content-header">
             <div style="display:flex; align-items:center; gap:10px;">
-                <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer;">☰</button>
+                <button id="mobile-menu-btn" aria-label="Abrir menú" style="background:none; border:none; font-size:1.25rem; color:var(--text-primary); cursor:pointer;"><i class="bi bi-list"></i></button>
                 
                 <div class="page-title">
                     <h1>Historial de Ventas</h1>
@@ -156,7 +157,7 @@ export function renderHistory() {
             
             <div class="header-actions" style="display:flex; align-items:center; gap:10px;">
                  <span style="font-weight:bold; color:var(--text-primary); display:none; display:md-block;">${new Date().toLocaleDateString()}</span>
-                 <button id="btn-toggle-theme" class="btn-icon" title="Cambiar Tema" style="background:var(--bg-card); border:1px solid var(--border-color); cursor:pointer; padding:8px; border-radius:8px; font-size:1.2rem; transition: all 0.3s ease;">🌓</button>
+                 <button id="btn-toggle-theme" class="btn-icon" title="Cambiar tema" aria-label="Cambiar tema" style="background:var(--bg-card); border:1px solid var(--border-color); cursor:pointer; padding:8px; border-radius:8px; font-size:1rem; transition: all 0.3s ease;"><i class="bi bi-circle-half"></i></button>
             </div>
         </header>
     `;
@@ -164,7 +165,7 @@ export function renderHistory() {
     const bodyHTML = `
         <div class="card-panel" style="background:transparent; padding:0; box-shadow:none; border:none;">
             <div id="history-loading" style="text-align:center; padding:50px; font-size:1.2rem; color:var(--text-secondary);">
-                ⏳ Cargando historial...
+                <i class="bi bi-hourglass-split" aria-hidden="true"></i> Cargando historial...
             </div>
             <div id="history-container"></div>
         </div>
@@ -196,8 +197,8 @@ export function renderHistory() {
 
     // --- RENDERIZADO COMPLETO (Recarga de página) ---
     const canOrders = (PermissionService && PermissionService.can) ? PermissionService.can('web_orders') : true;
-    const lockOrders = canOrders ? '' : '🔒 ';
-    const lockSuppliers = PermissionService.can('suppliers') ? '' : '🔒 ';
+    const lockOrders = !canOrders;
+    const lockSuppliers = !PermissionService.can('suppliers');
 
     return `
         ${styles}
@@ -205,20 +206,12 @@ export function renderHistory() {
             <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
             <aside class="admin-sidebar" id="admin-sidebar">
-                ${renderSidebarHeader()} 
-                <nav class="sidebar-menu" id="sidebar-menu-nav">
-                    <button class="menu-item" id="nav-dash"> Dashboard</button>
-                    <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event, 'web_orders')">
-                        ${lockOrders} Pedidos Web
-                    </button>
-                    <button class="menu-item" id="nav-inventory"> Inventario</button>
-                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
-                    <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event, 'suppliers')">${lockSuppliers} Estados de cuenta</button>
-                    <button class="menu-item active" id="nav-history"> Historial</button>
-                    <button class="menu-item" id="nav-settings"> Configuración</button>
-                    <div style="flex:1"></div>
-                    <button class="menu-item logout" id="nav-logout"> Salir</button>
-                </nav>
+                <div class="sidebar-logo">${renderSidebarHeader()}</div>
+                ${renderAdminSidebarNav({
+                    active: 'history',
+                    lockOrders,
+                    lockSuppliers
+                })}
             </aside>
 
             <main class="admin-content">

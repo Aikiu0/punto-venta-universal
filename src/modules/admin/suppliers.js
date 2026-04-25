@@ -2,15 +2,16 @@ import { supabase } from '../../data/supabase.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
 import { PermissionService } from '../../services/permissions.js';
 import { ThemeService } from '../../services/theme.js';
+import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 
 // --- CONFIGURACIÓN ---
 const PAGE_TITLE = "Proveedores & Clientes";
 
 export function renderSuppliers() {
-    const lockOrders = PermissionService.can('web_orders') ? '' : '🔒 ';
-    const lockBilling = PermissionService.can('billing') ? '' : '🔒 ';
-    const lockSettings = PermissionService.can('settings') ? '' : '🔒 ';
-    const lockHistory = PermissionService.can('history') ? '' : '🔒 ';
+    const lockOrders = !PermissionService.can('web_orders');
+    const lockBilling = !PermissionService.can('billing');
+    const lockSettings = !PermissionService.can('settings');
+    const lockHistory = !PermissionService.can('history');
 
     const styles = `
     <style>
@@ -289,28 +290,18 @@ export function renderSuppliers() {
                 <div class="sidebar-logo">
                     ${renderSidebarHeader()}
                 </div>
-                <nav class="sidebar-menu">
-                    <button class="menu-item" id="nav-dash"> Dashboard</button>
-                    <button class="menu-item" id="nav-orders" onclick="window.checkPlan(event, 'web_orders')">
-                        ${lockOrders} Pedidos Web
-                    </button>
-                    <button class="menu-item" id="nav-inventory"> Inventario</button>
-                    <button class="menu-item" id="nav-pos"> Ir a Caja</button>
-                    <button class="menu-item active"> Estados de cuenta</button>
-                    <button class="menu-item" id="nav-history" onclick="window.checkPlan(event, 'history')">
-                        ${lockHistory} Historial
-                    </button>
-                    <button class="menu-item" id="nav-settings" onclick="window.checkPlan(event, 'settings')">
-                        ${lockSettings} Configuración
-                    </button>
-                    <button class="menu-item logout" id="nav-logout"> Salir</button>
-                </nav>
+                ${renderAdminSidebarNav({
+                    active: 'suppliers',
+                    lockOrders,
+                    lockHistory,
+                    lockSettings
+                })}
             </aside>
 
             <main class="admin-content">
                 <header class="content-header">
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <button id="mobile-menu-btn" style="background:none; border:none; font-size:1.8rem; color:var(--text-primary); cursor:pointer;" class="mobile-only">☰</button>
+                        <button id="mobile-menu-btn" aria-label="Abrir menú" style="background:none; border:none; font-size:1.25rem; color:var(--text-primary); cursor:pointer;" class="mobile-only"><i class="bi bi-list"></i></button>
                         <div class="page-title">
                             <h1>${PAGE_TITLE}</h1>
                             <p>Gestión de compras, cuentas por pagar y estados de cuenta de clientes.</p>
@@ -320,10 +311,10 @@ export function renderSuppliers() {
                     <div style="display:flex; gap:15px; align-items:center;">
                         <button id="theme-toggle-sup" title="Cambiar Tema"
                             style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); padding:10px; border-radius:50%; cursor:pointer; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
-                            🌗
+                            <i class="bi bi-circle-half" aria-hidden="true"></i>
                         </button>
                         <button id="btn-main-add" class="btn-primary" style="display:flex; align-items:center; gap:8px;">
-                            <span>+</span> <span class="desktop-only">Nuevo</span>
+                            <i class="bi bi-plus-lg" aria-hidden="true"></i> <span class="desktop-only">Nuevo</span>
                         </button>
                     </div>
                 </header>
@@ -467,7 +458,7 @@ export function renderSuppliers() {
                                 <label>Cant.</label>
                                 <input type="number" id="pur-qty" placeholder="1" class="premium-input">
                             </div>
-                            <button id="btn-add-item" title="Agregar a la lista">+</button>
+                            <button id="btn-add-item" title="Agregar a la lista" aria-label="Agregar a la lista"><i class="bi bi-plus-lg"></i></button>
                         </div>
                         <div class="purchase-list-container" style="background:var(--bg-input, rgba(0,0,0,0.02)); padding:15px; border-radius:12px; max-height:200px; overflow-y:auto; border:1px solid var(--border-color); margin-bottom:25px;">
                             <ul id="purchase-list" style="list-style:none; padding:0; margin:0; color:var(--text-primary);"></ul>
@@ -616,7 +607,7 @@ export function renderSuppliers() {
                             <strong id="lbl-charge-debt-preview" style="font-size:1.4rem; color:#ef4444;">$0.00</strong>
                         </div>
                         <div id="charge-limit-warning" style="display:none; margin-top:12px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); padding:12px; border-radius:10px; color:#f59e0b; font-size:0.9rem; font-weight:600;">
-                            ⚠️ Este cargo supera el límite de crédito del cliente.
+                            <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Este cargo supera el límite de crédito del cliente.
                         </div>
                     </div>
                     <div class="modal-footer-premium">
@@ -656,7 +647,7 @@ export function renderSuppliers() {
                     <!-- Botón abonar rápido -->
                     <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
                         <button id="btn-quick-payment" style="background:var(--brand-color); color:white; border:none; padding:10px 20px; border-radius:10px; cursor:pointer; font-weight:700; font-size:0.9rem; display:flex; align-items:center; gap:8px;">
-                            💳 Registrar Abono
+                            <i class="bi bi-cash-coin" aria-hidden="true"></i> Registrar abono
                         </button>
                     </div>
 
@@ -714,7 +705,9 @@ export async function setupSuppliersLogic(router) {
     const updateThemeIcon = () => {
         if (themeBtn) {
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-            themeBtn.textContent = isDark ? '☀️' : '🌗';
+            themeBtn.innerHTML = isDark
+                ? '<i class="bi bi-sun-fill" aria-hidden="true"></i>'
+                : '<i class="bi bi-circle-half" aria-hidden="true"></i>';
         }
     };
     updateThemeIcon();
@@ -843,9 +836,9 @@ export async function setupSuppliersLogic(router) {
                 <td>${debtBadge}</td>
                 <td>
                     <div style="display:flex; gap:8px;">
-                        <button class="btn-buy" title="Nueva Compra" style="background:var(--primary-color, #6366f1); color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:0.9rem;">🛒</button>
-                        <button class="btn-hist" title="Ver Historial" style="background:var(--bg-input, transparent); color:var(--text-primary); border:1px solid var(--border-color); padding:8px 12px; border-radius:8px; cursor:pointer; font-size:0.9rem;">📜</button>
-                        <button class="btn-del" title="Eliminar" style="background:transparent; color:#ef4444; border:none; padding:8px; cursor:pointer; font-size:1.1rem;">🗑️</button>
+                        <button class="btn-buy" title="Nueva compra" style="background:var(--primary-color, #6366f1); color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:0.9rem;"><i class="bi bi-cart-plus"></i></button>
+                        <button class="btn-hist" title="Ver historial" style="background:var(--bg-input, transparent); color:var(--text-primary); border:1px solid var(--border-color); padding:8px 12px; border-radius:8px; cursor:pointer; font-size:0.9rem;"><i class="bi bi-clock-history"></i></button>
+                        <button class="btn-del" title="Eliminar" style="background:transparent; color:#ef4444; border:none; padding:8px; cursor:pointer; font-size:1.1rem;"><i class="bi bi-trash3"></i></button>
                     </div>
                 </td>`;
             tr.querySelector('.btn-buy').onclick = () => openPurchaseModal(s);
@@ -965,7 +958,7 @@ export async function setupSuppliersLogic(router) {
         const debt = total - paid;
         const msg = document.getElementById('pur-debt-msg');
         if (debt > 0.01) { msg.textContent = `Pendiente: ${fmtMoney(debt)}`; msg.style.color = '#ef4444'; }
-        else { msg.textContent = 'Liquidado ✅'; msg.style.color = '#10b981'; }
+        else { msg.textContent = 'Liquidado'; msg.style.color = '#10b981'; }
     }
 
     document.getElementById('btn-save-pur').onclick = async () => {
@@ -1149,7 +1142,7 @@ export async function setupSuppliersLogic(router) {
 
             let statusBadge;
             if (debt > 0.5 && c.credit_limit > 0 && debt >= c.credit_limit * 0.9) {
-                statusBadge = `<span class="badge-red">⚠ Límite</span>`;
+                statusBadge = `<span class="badge-red"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Límite</span>`;
             } else if (debt > 0.5) {
                 statusBadge = `<span class="badge-yellow">Con deuda</span>`;
             } else {
@@ -1175,8 +1168,8 @@ export async function setupSuppliersLogic(router) {
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                         <button class="btn-cli-charge" title="Registrar cargo" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); padding:7px 11px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:700;">+ Cargo</button>
                         <button class="btn-cli-account" title="Ver estado de cuenta" style="background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border-color); padding:7px 11px; border-radius:8px; cursor:pointer; font-size:0.85rem;">📋 Cuenta</button>
-                        <button class="btn-cli-edit" title="Editar" style="background:transparent; color:var(--text-secondary); border:none; padding:7px; cursor:pointer; font-size:1rem;">✏️</button>
-                        <button class="btn-cli-del" title="Eliminar" style="background:transparent; color:#ef4444; border:none; padding:7px; cursor:pointer; font-size:1rem;">🗑️</button>
+                        <button class="btn-cli-edit" title="Editar" style="background:transparent; color:var(--text-secondary); border:none; padding:7px; cursor:pointer; font-size:1rem;"><i class="bi bi-pencil-square"></i></button>
+                        <button class="btn-cli-del" title="Eliminar" style="background:transparent; color:#ef4444; border:none; padding:7px; cursor:pointer; font-size:1rem;"><i class="bi bi-trash3"></i></button>
                     </div>
                 </td>`;
 
