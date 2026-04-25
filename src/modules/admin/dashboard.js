@@ -9,6 +9,33 @@ import { renderSidebarHeader } from './components/sidebarHeader.js';
 let salesChartInstance = null;
 const activeAnimations = {};
 
+const icon = (name) => {
+    const icons = {
+        dashboard: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13.2c0-.75.42-1.43 1.08-1.79l6.5-3.55a2 2 0 0 1 1.84 0l6.5 3.55A2.04 2.04 0 0 1 20 13.2V19a2 2 0 0 1-2 2h-3.25a.75.75 0 0 1-.75-.75V16a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v4.25a.75.75 0 0 1-.75.75H6a2 2 0 0 1-2-2z" fill="currentColor"/></svg>`,
+        orders: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.75A2.75 2.75 0 0 1 9.75 2h4.5A2.75 2.75 0 0 1 17 4.75V6h1.25A2.75 2.75 0 0 1 21 8.75v8.5A2.75 2.75 0 0 1 18.25 20H5.75A2.75 2.75 0 0 1 3 17.25v-8.5A2.75 2.75 0 0 1 5.75 6H7zm1.5 0V6h7V4.75c0-.69-.56-1.25-1.25-1.25h-4.5c-.69 0-1.25.56-1.25 1.25" fill="currentColor"/></svg>`,
+        inventory: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.75A2.75 2.75 0 0 1 6.75 5h10.5A2.75 2.75 0 0 1 20 7.75v8.5A2.75 2.75 0 0 1 17.25 19H6.75A2.75 2.75 0 0 1 4 16.25zm4.75 1.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5zm0 4a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5z" fill="currentColor"/></svg>`,
+        pos: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.75 3h10.5A2.75 2.75 0 0 1 20 5.75v12.5A2.75 2.75 0 0 1 17.25 21H6.75A2.75 2.75 0 0 1 4 18.25V5.75A2.75 2.75 0 0 1 6.75 3M8 7.25c0 .41.34.75.75.75h6.5a.75.75 0 0 0 0-1.5h-6.5A.75.75 0 0 0 8 7.25m.75 3.75A.75.75 0 0 0 8 11.75v4.5c0 .41.34.75.75.75h6.5c.41 0 .75-.34.75-.75v-4.5a.75.75 0 0 0-.75-.75z" fill="currentColor"/></svg>`,
+        suppliers: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.75A2.75 2.75 0 0 1 6.75 6h10.5A2.75 2.75 0 0 1 20 8.75v6.5A2.75 2.75 0 0 1 17.25 18H6.75A2.75 2.75 0 0 1 4 15.25zm4.75.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5m-1 3.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5z" fill="currentColor"/></svg>`,
+        history: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 1-8.95 10h1.53A7.5 7.5 0 1 0 12 4.5c-1.93 0-3.69.73-5.02 1.93L9.5 9H3V2.5l2.9 2.9A8.96 8.96 0 0 1 12 3m-.75 4.25c0-.41.34-.75.75-.75s.75.34.75.75v4.19l2.47 1.42a.75.75 0 0 1-.74 1.3l-2.85-1.63a1.5 1.5 0 0 1-.88-1.3z" fill="currentColor"/></svg>`,
+        settings: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10.34 2.78 1.66-.96 1.66.96.45 1.84a7.92 7.92 0 0 1 1.47.86l1.82-.56 1.66.96v1.92l-1.37 1.3c.05.3.08.6.08.9s-.03.6-.08.9l1.37 1.3v1.92l-1.66.96-1.82-.56c-.46.35-.96.64-1.47.86l-.45 1.84-1.66.96-1.66-.96-.45-1.84a7.92 7.92 0 0 1-1.47-.86l-1.82.56-1.66-.96v-1.92l1.37-1.3A5.7 5.7 0 0 1 6.2 12c0-.3.03-.6.08-.9L4.9 9.8V7.88l1.66-.96 1.82.56c.46-.35.96-.64 1.47-.86zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6" fill="currentColor"/></svg>`,
+        logout: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.75 3a.75.75 0 0 1 0 1.5H7A2.5 2.5 0 0 0 4.5 7v10A2.5 2.5 0 0 0 7 19.5h3.75a.75.75 0 0 1 0 1.5H7A4 4 0 0 1 3 17V7a4 4 0 0 1 4-4zm5.72 4.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 1 1-1.06-1.06l2.97-2.97H9.75a.75.75 0 0 1 0-1.5h9.69l-2.97-2.97a.75.75 0 0 1 0-1.06" fill="currentColor"/></svg>`,
+        theme: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.25a.75.75 0 0 1 .75.75v1.25a.75.75 0 0 1-1.5 0V4a.75.75 0 0 1 .75-.75M6.52 5.47a.75.75 0 0 1 1.06 0l.88.88A.75.75 0 1 1 7.4 7.41l-.88-.88a.75.75 0 0 1 0-1.06m10.9 0a.75.75 0 0 1 0 1.06l-.88.88a.75.75 0 0 1-1.06-1.06l.88-.88a.75.75 0 0 1 1.06 0M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10m-8 4.25h1.25a.75.75 0 0 1 0 1.5H4a.75.75 0 0 1 0-1.5m14.75 0H20a.75.75 0 0 1 0 1.5h-1.25a.75.75 0 0 1 0-1.5M7.4 16.59a.75.75 0 0 1 1.06 1.06l-.88.88a.75.75 0 0 1-1.06-1.06zm9.2 0 .88.88a.75.75 0 0 1-1.06 1.06l-.88-.88a.75.75 0 1 1 1.06-1.06M12 18.75a.75.75 0 0 1 .75.75v1.25a.75.75 0 0 1-1.5 0V19.5a.75.75 0 0 1 .75-.75" fill="currentColor"/></svg>`,
+        sales: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18.5A2.5 2.5 0 0 1 3.5 16V8A2.5 2.5 0 0 1 6 5.5h12A2.5 2.5 0 0 1 20.5 8v8a2.5 2.5 0 0 1-2.5 2.5zm0-11.5a1 1 0 0 0-1 1v.25h14V8a1 1 0 0 0-1-1zm-1 3v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6z" fill="currentColor"/></svg>`,
+        profit: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.41 0 .75.34.75.75v.96c1.98.24 3.5 1.64 3.5 3.54a.75.75 0 0 1-1.5 0c0-1.14-1.11-2.05-2.75-2.05s-2.75.91-2.75 2.05c0 1 .83 1.48 2.98 1.94 1.95.42 4.27 1 4.27 3.56 0 1.94-1.57 3.36-3.75 3.58v.92a.75.75 0 0 1-1.5 0v-.92c-2.18-.22-3.75-1.64-3.75-3.58a.75.75 0 0 1 1.5 0c0 1.14 1.11 2.05 3 2.05s3-.91 3-2.05c0-1.12-.94-1.57-3.09-2.03C8.96 12.5 7.75 11.72 7.75 9.25c0-1.9 1.52-3.3 3.5-3.54v-.96c0-.41.34-.75.75-.75" fill="currentColor"/></svg>`,
+        month: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.75 3a.75.75 0 0 1 .75.75V5h7V3.75a.75.75 0 0 1 1.5 0V5h.25A2.75 2.75 0 0 1 20 7.75v9.5A2.75 2.75 0 0 1 17.25 20H6.75A2.75 2.75 0 0 1 4 17.25v-9.5A2.75 2.75 0 0 1 6.75 5H7V3.75A.75.75 0 0 1 7.75 3m-2.25 6v8.25c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V9z" fill="currentColor"/></svg>`,
+        avg: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5 4.5 8.25 12 12l7.5-3.75zm-6 5.1v4.65L12 18l6-3.75V9.6L12.34 12.4a.75.75 0 0 1-.68 0z" fill="currentColor"/></svg>`,
+        alert: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75 2.84 19.5c-.38.66.09 1.5.84 1.5h16.64c.75 0 1.22-.84.84-1.5zM12 9c.41 0 .75.34.75.75v4.5a.75.75 0 0 1-1.5 0v-4.5c0-.41.34-.75.75-.75m0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2" fill="currentColor"/></svg>`,
+        trend: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16.25 10.25 11l3 3L19 8.25V12a.75.75 0 0 0 1.5 0V6.5A1.5 1.5 0 0 0 19 5h-5.5a.75.75 0 0 0 0 1.5h3.69l-4.94 4.94-3-3a1 1 0 0 0-1.41 0L3.94 15.2A.75.75 0 1 0 5 16.25" fill="currentColor"/></svg>`,
+        products: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.75 4 7v10l8 4.25L20 17V7zm0 1.7 6.15 3.27L12 11 5.85 7.72zM5.5 9.03l5.75 3.05v7.16L5.5 16.2zm7.25 10.21v-7.16l5.75-3.05v7.17z" fill="currentColor"/></svg>`,
+        chart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.75 19A2.75 2.75 0 0 1 3 16.25v-8.5A2.75 2.75 0 0 1 5.75 5h12.5A2.75 2.75 0 0 1 21 7.75v8.5A2.75 2.75 0 0 1 18.25 19zm-.25-2.75c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-7.5H5.5zm2.6-1.1a.75.75 0 0 1-.53-1.28l2.53-2.53a.75.75 0 0 1 .98-.08l1.89 1.42 2.91-3.4a.75.75 0 1 1 1.14.97l-3.38 3.96a.75.75 0 0 1-1.02.1l-1.93-1.45-2.07 2.07a.75.75 0 0 1-.52.22" fill="currentColor"/></svg>`,
+        debt: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8 .75.75 0 0 1 1.5 0 9.5 9.5 0 1 1-2.78-6.72.75.75 0 1 1-1.06 1.06A7.95 7.95 0 0 0 12 4m.75 3.25a.75.75 0 0 0-1.5 0v5c0 .2.08.39.22.53l3.25 3.25a.75.75 0 0 0 1.06-1.06l-3.03-3.03z" fill="currentColor"/></svg>`,
+        slow: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5A8.5 8.5 0 1 0 20.5 12 .75.75 0 0 1 22 12 10 10 0 1 1 12 2a.75.75 0 0 1 0 1.5m.75 3.75a.75.75 0 0 0-1.5 0v5.06c0 .2.08.39.22.53l2.75 2.75a.75.75 0 1 0 1.06-1.06l-2.53-2.53z" fill="currentColor"/></svg>`,
+        stock: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.75 4 7v10l8 4.25L20 17V7zm0 1.7 6.15 3.27L12 11 5.85 7.72zm-6.5 4.58 5.75 3.05v7.16L5.5 16.2zm7.25 10.21v-7.16l5.75-3.05v7.17z" fill="currentColor"/></svg>`,
+        empty: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.75 4h10.5A2.75 2.75 0 0 1 20 6.75v10.5A2.75 2.75 0 0 1 17.25 20H6.75A2.75 2.75 0 0 1 4 17.25V6.75A2.75 2.75 0 0 1 6.75 4m1 4.25a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5zm0 4a.75.75 0 0 0 0 1.5h5.5a.75.75 0 0 0 0-1.5z" fill="currentColor"/></svg>`
+    };
+    return icons[name] || '';
+};
+
 // ── Utils ──────────────────────────────────────────────────────
 function animateValue(id, start, end, duration, isCurrency = true) {
     const obj = document.getElementById(id);
@@ -33,9 +60,9 @@ const fmtNum = (n) => Number(n || 0).toLocaleString('es-MX');
 
 function getSaludo() {
     const h = new Date().getHours();
-    if (h < 12) return '☀️ Buenos días';
-    if (h < 19) return '🌤️ Buenas tardes';
-    return '🌙 Buenas noches';
+    if (h < 12) return 'Buenos días';
+    if (h < 19) return 'Buenas tardes';
+    return 'Buenas noches';
 }
 function getDayName() {
     return new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -57,379 +84,934 @@ export function renderDashboard() {
 
     return `
     <style>
-        /* ── Animaciones ── */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        .dashboard-shell {
+            --dash-bg: #08111f;
+            --dash-surface: #0f1b2d;
+            --dash-surface-soft: #13233a;
+            --dash-surface-elevated: #162942;
+            --dash-border: rgba(148, 163, 184, 0.16);
+            --dash-border-strong: rgba(148, 163, 184, 0.24);
+            --dash-text: #e5eefc;
+            --dash-text-muted: #90a2bf;
+            --dash-text-soft: #6f839f;
+            --dash-brand: #7c6cf2;
+            --dash-brand-soft: rgba(124, 108, 242, 0.14);
+            --dash-success: #24b47e;
+            --dash-warning: #d5a447;
+            --dash-danger: #e46c75;
+            --dash-shadow: 0 20px 45px rgba(2, 6, 23, 0.32);
+            --dash-radius-lg: 24px;
+            --dash-radius-md: 18px;
+            --dash-radius-sm: 14px;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        .dashboard-shell.admin-container {
+            grid-template-columns: minmax(248px, 280px) 1fr;
+            background:
+                radial-gradient(circle at top right, rgba(124, 108, 242, 0.12), transparent 22%),
+                radial-gradient(circle at bottom left, rgba(36, 180, 126, 0.08), transparent 18%),
+                var(--dash-bg);
+            color: var(--dash-text);
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        .dashboard-shell .admin-sidebar {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            padding: 22px 18px 18px;
+            border-right: 1px solid var(--dash-border);
+            background:
+                linear-gradient(180deg, rgba(19, 35, 58, 0.96), rgba(9, 18, 31, 0.98));
+            backdrop-filter: blur(18px);
+            box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .dashboard-shell .sidebar-logo {
+            margin-bottom: 20px;
+        }
+
+        .dashboard-shell #sidebar-header-root {
+            padding: 24px 14px 18px 14px !important;
+            margin-bottom: 12px !important;
+            border-radius: 22px;
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 30px rgba(2, 6, 23, 0.2) !important;
+        }
+
+        .dashboard-shell .premium-glass-container {
+            width: 60px !important;
+            height: 60px !important;
+            border-radius: 18px !important;
+            border: 1px solid rgba(148, 163, 184, 0.16) !important;
+            background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)) !important;
+            box-shadow: none !important;
+        }
+
+        .dashboard-shell #sb-real-name {
+            font-size: 0.98rem !important;
+            font-weight: 600 !important;
+            letter-spacing: -0.01em !important;
+        }
+
+        .dashboard-shell .plan-badge-premium {
+            background: linear-gradient(135deg, rgba(213, 164, 71, 0.92), rgba(180, 131, 46, 0.92)) !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+        }
+
+        .dashboard-shell .sidebar-menu {
+            flex: 1;
+            gap: 8px;
+        }
+
+        .dashboard-shell .menu-item {
+            min-height: 48px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            color: var(--dash-text-muted);
+            gap: 12px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border: 1px solid transparent;
+            transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+        }
+
+        .dashboard-shell .menu-item:hover {
+            background: rgba(255,255,255,0.04);
+            border-color: rgba(148, 163, 184, 0.12);
+            color: var(--dash-text);
+            transform: translateX(2px);
+        }
+
+        .dashboard-shell .menu-item.active {
+            background: linear-gradient(180deg, rgba(124, 108, 242, 0.16), rgba(124, 108, 242, 0.08));
+            border-color: rgba(124, 108, 242, 0.28);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+            color: #f8fbff;
+        }
+
+        .dashboard-shell .menu-item.logout {
+            margin-top: auto;
+            color: #f1b3b7;
+            background: rgba(228, 108, 117, 0.06);
+            border-color: rgba(228, 108, 117, 0.12);
+        }
+
+        .dashboard-shell .menu-item.logout:hover {
+            background: rgba(228, 108, 117, 0.12);
+            border-color: rgba(228, 108, 117, 0.2);
+            color: #ffd2d6;
+        }
+
+        .menu-icon {
+            width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            opacity: 0.92;
+        }
+
+        .menu-icon svg,
+        .section-icon svg,
+        .metric-icon svg,
+        .action-icon svg,
+        .state-icon svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .dashboard-shell .admin-content {
+            padding: 28px;
+            overflow-y: auto;
+        }
+
+        .dashboard-main {
+            max-width: 1480px;
+            margin: 0 auto;
+        }
+
         @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
         .anim-stagger { opacity:0; animation: fadeInUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
         .delay-1{animation-delay:.05s}.delay-2{animation-delay:.1s}.delay-3{animation-delay:.15s}
         .delay-4{animation-delay:.2s}.delay-5{animation-delay:.25s}.delay-6{animation-delay:.3s}
         .delay-7{animation-delay:.35s}.delay-8{animation-delay:.4s}
 
-        /* ── KPI Cards ── */
+        .dashboard-shell :focus-visible {
+            outline: 2px solid rgba(124, 108, 242, 0.88);
+            outline-offset: 2px;
+        }
+
+        .dashboard-shell .section-grid {
+            display: grid;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .saludo-bar {
+            background:
+                linear-gradient(180deg, rgba(20, 33, 53, 0.94), rgba(12, 23, 39, 0.94)),
+                linear-gradient(90deg, rgba(124, 108, 242, 0.12), transparent);
+            border: 1px solid var(--dash-border);
+            box-shadow: var(--dash-shadow);
+            color: var(--dash-text);
+            border-radius: var(--dash-radius-lg);
+            padding: 22px 24px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .saludo-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .saludo-eyebrow {
+            color: var(--dash-text-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .saludo-text {
+            font-size: clamp(1.5rem, 2vw, 2rem);
+            line-height: 1.05;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+
+        .saludo-date {
+            font-size: 0.95rem;
+            color: var(--dash-text-muted);
+            margin: 0;
+        }
+
+        .saludo-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .ghost-action,
+        .dash-hamburger {
+            width: 42px;
+            height: 42px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--dash-text);
+            cursor: pointer;
+            transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
+        }
+
+        .ghost-action:hover,
+        .dash-hamburger:hover {
+            transform: translateY(-1px);
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(148, 163, 184, 0.22);
+        }
+
+        .action-icon {
+            width: 18px;
+            height: 18px;
+        }
+
+        .dash-topbar {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: linear-gradient(180deg, rgba(8, 17, 31, 0.96) 75%, rgba(8, 17, 31, 0));
+            backdrop-filter: blur(10px);
+        }
+
+        .dash-topbar-title {
+            font-weight: 600;
+            font-size: 1rem;
+            letter-spacing: -0.02em;
+            color: var(--dash-text);
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
         .kpi-card {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 18px 16px;
-            border: 1px solid var(--border-color);
             position: relative;
             overflow: hidden;
-            transition: transform 0.2s, box-shadow 0.2s;
+            min-height: 168px;
+            padding: 20px;
+            border-radius: var(--dash-radius-md);
+            border: 1px solid var(--dash-border);
+            background: linear-gradient(180deg, rgba(18, 31, 50, 0.94), rgba(11, 22, 36, 0.94));
+            box-shadow: var(--dash-shadow);
+            transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
         }
-        .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.07); }
+
+        .kpi-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--dash-border-strong);
+            box-shadow: 0 24px 40px rgba(2, 6, 23, 0.38);
+        }
+
+        .kpi-accent {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 18px;
+            border: 1px solid currentColor;
+            background: rgba(255,255,255,0.04);
+            opacity: 0.95;
+        }
+
+        .metric-icon {
+            width: 20px;
+            height: 20px;
+        }
+
         .kpi-label {
-            font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.6px; color: var(--text-secondary); margin: 0 0 6px 0;
+            font-size: 0.76rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--dash-text-muted);
+            margin: 0 0 8px 0;
         }
-        .kpi-number { font-size: 1.7rem; font-weight: 800; margin: 0; line-height: 1; color: var(--text-primary); }
-        .kpi-sub    { font-size: 0.75rem; color: var(--text-secondary); margin-top: 5px; }
-        .kpi-icon   { position:absolute; right:-6px; top:-6px; font-size:3rem; opacity:0.05; }
 
-        /* ── Report sections ── */
+        .kpi-number {
+            font-size: clamp(1.8rem, 2.5vw, 2.35rem);
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.04em;
+            margin: 0;
+            color: var(--dash-text);
+        }
+
+        .kpi-sub {
+            font-size: 0.86rem;
+            font-weight: 500;
+            color: var(--dash-text-muted);
+            margin-top: 8px;
+        }
+
         .report-section {
-            background: var(--bg-card); border-radius: 14px;
-            border: 1px solid var(--border-color); overflow: hidden;
+            background: linear-gradient(180deg, rgba(18, 31, 50, 0.96), rgba(11, 22, 36, 0.96));
+            border: 1px solid var(--dash-border);
+            border-radius: var(--dash-radius-md);
+            overflow: hidden;
+            box-shadow: var(--dash-shadow);
+            transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
         }
-        .report-header {
-            padding: 14px 18px; border-bottom: 1px solid var(--border-color);
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .report-title { font-size: 0.92rem; font-weight: 800; color: var(--text-primary); margin: 0; }
-        .report-body  { padding: 14px 18px; }
 
-        /* ── Alertas ── */
+        .report-section:hover {
+            transform: translateY(-2px);
+            border-color: rgba(148, 163, 184, 0.2);
+            box-shadow: 0 24px 40px rgba(2, 6, 23, 0.34);
+        }
+
+        .report-header {
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid var(--dash-border);
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .report-heading {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .section-icon {
+            width: 38px;
+            height: 38px;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            color: var(--dash-text-muted);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+        }
+
+        .report-title-wrap {
+            min-width: 0;
+        }
+
+        .report-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--dash-text);
+            margin: 0 0 4px 0;
+            letter-spacing: -0.02em;
+        }
+
+        .report-subtitle,
+        .report-tag {
+            font-size: 0.8rem;
+            color: var(--dash-text-muted);
+        }
+
+        .report-tag {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255,255,255,0.03);
+            font-weight: 600;
+        }
+
+        .report-body {
+            padding: 18px 20px 20px;
+        }
+
         .alert-row {
-            display: flex; align-items: center; gap: 10px;
-            padding: 9px 12px; border-radius: 9px; margin-bottom: 7px;
-            font-size: 0.85rem; font-weight: 600;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 14px;
+            border-radius: 14px;
+            margin-bottom: 10px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            border: 1px solid transparent;
         }
         .alert-row:last-child { margin-bottom: 0; }
-        .alert-critical { background:rgba(239,68,68,.1);  border:1px solid rgba(239,68,68,.2);  color:#ef4444; }
-        .alert-warning  { background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.2); color:#f59e0b; }
-        .alert-ok       { background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); color:#10b981; }
+        .alert-critical { background:rgba(228,108,117,.12);  border-color:rgba(228,108,117,.22);  color:#ffd4d7; }
+        .alert-warning  { background:rgba(213,164,71,.11); border-color:rgba(213,164,71,.22); color:#f4dfae; }
+        .alert-ok       { background:rgba(36,180,126,.12); border-color:rgba(36,180,126,.2); color:#c7f0df; }
 
-        /* ── Comparativo ── */
+        .state-icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .state-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px dashed rgba(148, 163, 184, 0.2);
+            background: rgba(255,255,255,0.02);
+            color: var(--dash-text-muted);
+            font-size: 0.9rem;
+        }
+
+        .state-card strong {
+            display: block;
+            color: var(--dash-text);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
         .compare-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 0; border-bottom: 1px solid var(--border-color); gap: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--dash-border);
+            gap: 12px;
         }
         .compare-row:last-child { border-bottom: none; }
-        .compare-label   { font-size: 0.85rem; color: var(--text-secondary); }
-        .compare-values  { display: flex; gap: 12px; align-items: center; }
-        .compare-current { font-weight: 800; font-size: 0.95rem; color: var(--text-primary); }
-        .trend-badge     { padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 800; }
-        .trend-up   { background:rgba(16,185,129,.15); color:#10b981; }
-        .trend-down { background:rgba(239,68,68,.15);  color:#ef4444; }
-        .trend-flat { background:rgba(148,163,184,.15); color:#94a3b8; }
+        .compare-label   { font-size: 0.88rem; color: var(--dash-text-muted); }
+        .compare-values  { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+        .compare-current { font-weight: 700; font-size: 1rem; color: var(--dash-text); letter-spacing: -0.02em; }
+        .trend-badge     { padding: 5px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; }
+        .trend-up   { background:rgba(36,180,126,.14); color:#bcf0d7; }
+        .trend-down { background:rgba(228,108,117,.14); color:#ffd4d7; }
+        .trend-flat { background:rgba(148,163,184,.12); color:#c7d2e3; }
+        .comparison-summary {
+            margin-top: 14px;
+            padding: 13px 14px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--dash-border);
+            font-size: 0.82rem;
+            color: var(--dash-text-muted);
+        }
 
-        /* ── Ranking productos ── */
         .product-rank-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 9px 0; border-bottom: 1px solid var(--border-color);
+            display: grid;
+            grid-template-columns: auto minmax(0,1fr) auto;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--dash-border);
         }
         .product-rank-item:last-child { border-bottom: none; }
         .rank-number {
-            width: 26px; height: 26px; border-radius: 7px;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 800; font-size: 0.82rem; flex-shrink: 0;
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+            flex-shrink: 0;
         }
         .rank-bar-wrap { flex: 1; min-width: 0; }
-        .rank-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); margin-bottom: 3px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .rank-bar-bg   { height: 5px; background: var(--bg-input); border-radius: 10px; overflow: hidden; }
-        .rank-bar-fill { height: 100%; border-radius: 10px; transition: width 1s ease; }
-        .rank-qty      { font-weight: 800; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; }
+        .rank-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--dash-text);
+            margin-bottom: 7px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .rank-bar-bg {
+            height: 8px;
+            background: rgba(148, 163, 184, 0.12);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .rank-bar-fill { height: 100%; border-radius: 999px; transition: width 1s ease; }
+        .rank-qty      { font-weight: 700; font-size: 0.92rem; color: var(--dash-text); white-space: nowrap; text-align: right; }
 
-        /* ── Deuda clientes ── */
         .debt-client-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 9px 0; border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--dash-border);
+            gap: 12px;
         }
         .debt-client-row:last-child { border-bottom: none; }
+        .debt-summary,
+        .capital-summary {
+            border-radius: 16px;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid transparent;
+        }
+        .debt-summary {
+            background: rgba(228,108,117,.08);
+            border-color: rgba(228,108,117,.18);
+        }
+        .capital-summary {
+            background: rgba(213,164,71,.08);
+            border-color: rgba(213,164,71,.18);
+        }
+        .summary-label {
+            font-size: 0.8rem;
+            color: var(--dash-text-muted);
+        }
+        .summary-value {
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
 
-        /* ── Stock muerto ── */
         .dead-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 9px 0; border-bottom: 1px dashed var(--border-color); font-size: 0.87rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px dashed rgba(148, 163, 184, 0.18);
+            font-size: 0.88rem;
+            gap: 12px;
         }
         .dead-item:last-child { border-bottom: none; }
 
-        /* ── Saludo bar ── */
-        .saludo-bar {
-            background: linear-gradient(135deg, var(--brand-color) 0%, #a855f7 100%);
-            color: white; border-radius: 14px; padding: 14px 18px;
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 16px; gap: 10px; flex-wrap: wrap;
+        .status-pill {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 999px;
+            white-space: nowrap;
         }
-        .saludo-text { font-size: 1rem; font-weight: 800; }
-        .saludo-date { font-size: 0.8rem; opacity: 0.85; margin-top: 2px; }
 
-        /* ── Gráfica blur ── */
+        .low-stock-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .low-stock-card {
+            padding: 14px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid transparent;
+            transition: transform .2s ease, border-color .2s ease;
+        }
+
+        .low-stock-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .chart-toolbar {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .chart-pill {
+            padding: 7px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255,255,255,0.03);
+            color: var(--dash-text-muted);
+            font-size: 0.76rem;
+            font-weight: 600;
+        }
+
+        .chart-pill.is-active {
+            color: var(--dash-text);
+            border-color: rgba(124, 108, 242, 0.26);
+            background: rgba(124, 108, 242, 0.12);
+        }
+
         .premium-blur-container { position: relative; overflow: hidden; border-radius: 10px; }
         .premium-blur-content   { filter: blur(8px); opacity: .6; pointer-events: none; user-select: none; }
         .premium-lock-overlay {
             position: absolute; top:0; left:0; width:100%; height:100%; z-index:50;
             cursor: pointer; display: flex; flex-direction: column;
             justify-content: center; align-items: center;
-            background: rgba(255,255,255,.1); transition: background .3s;
+            background: rgba(8,17,31,.42); transition: background .3s;
         }
-        .premium-lock-overlay:hover { background: rgba(255,255,255,.3); }
-        .lock-badge { font-size: 2.5rem; margin-bottom: 8px; }
-        .lock-text  { font-weight: bold; color: #1e293b; background: rgba(255,255,255,.9); padding: 4px 14px; border-radius: 20px; }
-
-        /* ── Mobile top bar (hamburguesa + título) ── */
-        .dash-topbar {
-            display: none; /* Oculto en escritorio */
+        .premium-lock-overlay:hover { background: rgba(8,17,31,.54); }
+        .lock-badge {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            background: rgba(255,255,255,.08);
+            color: var(--dash-text);
         }
-        .dash-hamburger {
-            background: none; border: none; font-size: 1.6rem;
-            color: var(--text-primary); cursor: pointer; padding: 4px; line-height: 1;
-            flex-shrink: 0;
+        .lock-text {
+            font-weight: 600;
+            color: var(--dash-text);
+            background: rgba(8,17,31,.7);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            padding: 8px 14px;
+            border-radius: 999px;
         }
-        .dash-topbar-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+
         .dash-topbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 
-        /* ── RESPONSIVE MÓVIL ── */
-        @media(max-width: 768px) {
-            /* Mostrar topbar móvil */
-            .dash-topbar { display: flex; }
-
-            /* El admin-content no tiene el header de escritorio en móvil */
-            .dash-desktop-header { display: none; }
-
-            /* Padding reducido en móvil */
-            .admin-content { padding: 12px !important; }
-
-            /* Saludo más compacto */
-            .saludo-bar {
-                flex-direction: column; text-align: center;
-                padding: 12px 14px; gap: 8px;
-            }
-            .saludo-text { font-size: 0.92rem; }
-            .saludo-date { font-size: 0.75rem; }
-
-            /* KPIs: 2 columnas en móvil */
+        @media(max-width: 1100px) {
             .kpi-grid {
-                grid-template-columns: 1fr 1fr !important;
-                gap: 10px !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
-            .kpi-number { font-size: 1.3rem; }
-            .kpi-label  { font-size: 0.68rem; }
-            .kpi-sub    { font-size: 0.7rem; }
 
-            /* Filas de 2 columnas → 1 columna en móvil */
-            .row-2col  { grid-template-columns: 1fr !important; }
-            .row-auto  { grid-template-columns: 1fr !important; }
+            .low-stock-grid {
+                grid-template-columns: 1fr;
+            }
+        }
 
-            /* Tamaño de fuente en cards */
-            .report-title   { font-size: 0.85rem; }
-            .report-body    { padding: 12px 14px; }
-            .report-header  { padding: 12px 14px; }
-
-            /* Comparativo en móvil */
-            .compare-row    { flex-wrap: wrap; gap: 4px; }
-            .compare-values { gap: 6px; }
-
-            /* Stock bajo: 1 columna en móvil */
-            .low-stock-grid { grid-template-columns: 1fr !important; }
-
-            /* Gráfica más baja en móvil */
-            .chart-container { height: 200px !important; }
-
-            /* Rank items */
-            .rank-qty { font-size: 0.78rem; }
-
-            /* Alerts */
-            .alert-row { font-size: 0.8rem; padding: 8px 10px; }
+        @media(max-width: 768px) {
+            .dash-topbar { display: flex; }
+            .dash-desktop-header { display: none; }
+            .dashboard-shell.admin-container {
+                display: block;
+            }
+            .dashboard-shell .admin-sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                z-index: 2000;
+                width: min(86vw, 300px);
+                transform: translateX(-100%);
+                transition: transform .28s ease;
+                box-shadow: 20px 0 50px rgba(2, 6, 23, 0.45);
+            }
+            .dashboard-shell .admin-sidebar.active {
+                transform: translateX(0);
+            }
+            .dashboard-shell .sidebar-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 1999;
+                background: rgba(2, 6, 23, 0.56);
+                backdrop-filter: blur(3px);
+            }
+            .dashboard-shell .sidebar-overlay.active {
+                display: block;
+            }
+            .dashboard-shell .admin-content { padding: 16px; }
+            .saludo-bar {
+                grid-template-columns: 1fr;
+                padding: 18px;
+                gap: 14px;
+            }
+            .row-2col,
+            .row-auto,
+            .kpi-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .kpi-card {
+                min-height: auto;
+            }
+            .report-header,
+            .report-body {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+            .report-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .compare-row,
+            .product-rank-item,
+            .debt-client-row,
+            .dead-item {
+                grid-template-columns: 1fr;
+                align-items: flex-start;
+            }
+            .compare-values,
+            .rank-qty {
+                justify-content: flex-start;
+                text-align: left;
+            }
+            .chart-container { height: 220px !important; }
         }
 
         @media(max-width: 400px) {
-            /* Pantallas muy pequeñas: KPIs en 1 columna */
             .kpi-grid { grid-template-columns: 1fr !important; }
-            .kpi-number { font-size: 1.5rem; }
+            .saludo-text { font-size: 1.35rem; }
+            .chart-pill { width: 100%; justify-content: center; display: inline-flex; }
         }
     </style>
 
-    <div class="admin-container">
+    <div class="admin-container dashboard-shell">
         <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
         <aside class="admin-sidebar" id="admin-sidebar">
             <div class="sidebar-logo">${renderSidebarHeader()}</div>
             <nav class="sidebar-menu">
-                <button class="menu-item active"> Dashboard</button>
-                <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event,'web_orders')">${lockOrders} Pedidos Web</button>
-                <button class="menu-item" id="nav-inventory"> Inventario</button>
-                <button class="menu-item" id="nav-pos"> Ir a Caja</button>
-                <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event,'suppliers')">${lockSuppliers} Estados de cuenta</button>
-                <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event,'history')">${lockHistory} Historial</button>
-                <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event,'settings')">${lockSettings} Configuración</button>
-                <button class="menu-item logout" id="nav-logout"> Salir</button>
+                <button class="menu-item active" aria-current="page"><span class="menu-icon">${icon('dashboard')}</span><span>Dashboard</span></button>
+                <button class="menu-item" id="nav-orders" onclick="return window.checkPlan(event,'web_orders')"><span class="menu-icon">${icon('orders')}</span><span>${lockOrders}Pedidos web</span></button>
+                <button class="menu-item" id="nav-inventory"><span class="menu-icon">${icon('inventory')}</span><span>Inventario</span></button>
+                <button class="menu-item" id="nav-pos"><span class="menu-icon">${icon('pos')}</span><span>Ir a caja</span></button>
+                <button class="menu-item" id="nav-suppliers" onclick="return window.checkPlan(event,'suppliers')"><span class="menu-icon">${icon('suppliers')}</span><span>${lockSuppliers}Estados de cuenta</span></button>
+                <button class="menu-item" id="nav-history" onclick="return window.checkPlan(event,'history')"><span class="menu-icon">${icon('history')}</span><span>${lockHistory}Historial</span></button>
+                <button class="menu-item" id="nav-settings" onclick="return window.checkPlan(event,'settings')"><span class="menu-icon">${icon('settings')}</span><span>${lockSettings}Configuración</span></button>
+                <button class="menu-item logout" id="nav-logout"><span class="menu-icon">${icon('logout')}</span><span>Salir</span></button>
             </nav>
         </aside>
 
-        <main class="admin-content" style="padding:24px 28px; overflow-y:auto;">
-
-            <!-- ══ TOP BAR MÓVIL (solo visible en pantallas pequeñas) ══ -->
+        <main class="admin-content">
             <div class="dash-topbar">
-                <button class="dash-hamburger" id="mobile-menu-btn" aria-label="Abrir menú">☰</button>
+                <button class="dash-hamburger" id="mobile-menu-btn" aria-label="Abrir menú"><span class="action-icon">${icon('dashboard')}</span></button>
                 <span class="dash-topbar-title">Dashboard</span>
                 <div class="dash-topbar-right">
-                    <button id="theme-toggle-dash-mobile"
-                        style="background:var(--bg-input);border:1px solid var(--border-color);
-                               color:var(--text-primary);width:34px;height:34px;border-radius:8px;
-                               cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;">
-                        🌗
-                    </button>
+                    <button id="theme-toggle-dash-mobile" class="ghost-action" aria-label="Cambiar tema"><span class="action-icon">${icon('theme')}</span></button>
                 </div>
             </div>
 
-            <!-- ══ SALUDO (escritorio y móvil) ══ -->
-            <div class="saludo-bar anim-stagger delay-1" style="margin-top:0;">
-                <div>
+            <div class="dashboard-main">
+            <div class="saludo-bar anim-stagger delay-1">
+                <div class="saludo-meta">
+                    <div class="saludo-eyebrow">Resumen general</div>
                     <div class="saludo-text">${getSaludo()}</div>
                     <div class="saludo-date">${getDayName()}</div>
                 </div>
-                <!-- Botones solo visibles en escritorio -->
-                <div class="dash-desktop-header" style="display:flex;gap:12px;align-items:center;">
-                    <button id="theme-toggle-dash"
-                        style="background:rgba(255,255,255,.2);border:none;color:white;
-                               width:36px;height:36px;border-radius:9px;cursor:pointer;font-size:1.1rem;">
-                        🌗
-                    </button>
+                <div class="saludo-actions dash-desktop-header">
+                    <button id="theme-toggle-dash" class="ghost-action" aria-label="Cambiar tema"><span class="action-icon">${icon('theme')}</span></button>
                 </div>
             </div>
 
-            <!-- ══ FILA 1: KPIs ══ -->
-            <div class="kpi-grid anim-stagger delay-2"
-                 style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:18px;">
-
-                <div class="kpi-card" style="border-top:4px solid #3b82f6;">
-                    <div class="kpi-icon">💰</div>
+            <div class="kpi-grid anim-stagger delay-2">
+                <div class="kpi-card" style="color:#74a7ff;">
+                    <div class="kpi-accent"><span class="metric-icon">${icon('sales')}</span></div>
                     <p class="kpi-label">Vendí hoy</p>
-                    <p id="kpi-today" class="kpi-number" style="color:#3b82f6;">$0.00</p>
+                    <p id="kpi-today" class="kpi-number">$0.00</p>
                     <p class="kpi-sub" id="kpi-today-txn">0 ventas realizadas</p>
                 </div>
 
-                <div class="kpi-card" style="border-top:4px solid #10b981;">
-                    <div class="kpi-icon">💵</div>
+                <div class="kpi-card" style="color:#46c893;">
+                    <div class="kpi-accent"><span class="metric-icon">${icon('profit')}</span></div>
                     <p class="kpi-label">Gané hoy</p>
-                    <p id="kpi-profit" class="kpi-number" style="color:#10b981;">$0.00</p>
+                    <p id="kpi-profit" class="kpi-number">$0.00</p>
                     <p class="kpi-sub">Después de costos</p>
                 </div>
 
-                <div class="kpi-card" style="border-top:4px solid #8b5cf6;">
-                    <div class="kpi-icon">📅</div>
+                <div class="kpi-card" style="color:#9b8cff;">
+                    <div class="kpi-accent"><span class="metric-icon">${icon('month')}</span></div>
                     <p class="kpi-label">Total del mes</p>
-                    <p id="kpi-month" class="kpi-number" style="color:#8b5cf6;">$0.00</p>
+                    <p id="kpi-month" class="kpi-number">$0.00</p>
                     <p class="kpi-sub" id="kpi-month-days">Este mes hasta hoy</p>
                 </div>
 
-                <div class="kpi-card" style="border-top:4px solid #f59e0b;">
-                    <div class="kpi-icon">🧾</div>
+                <div class="kpi-card" style="color:#ebc16c;">
+                    <div class="kpi-accent"><span class="metric-icon">${icon('avg')}</span></div>
                     <p class="kpi-label">Ticket promedio</p>
-                    <p id="kpi-avg" class="kpi-number" style="color:#f59e0b;">$0.00</p>
+                    <p id="kpi-avg" class="kpi-number">$0.00</p>
                     <p class="kpi-sub">Por venta</p>
                 </div>
-
             </div>
 
-            <!-- ══ FILA 2: ALERTAS + COMPARATIVO ══ -->
-            <div class="row-2col anim-stagger delay-4"
-                 style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px;">
-
+            <div class="section-grid row-2col anim-stagger delay-4" style="grid-template-columns:1fr 1fr;">
                 <div class="report-section">
                     <div class="report-header">
-                        <h3 class="report-title"> Alertas importantes</h3>
-                        <small style="color:var(--text-secondary);font-size:0.72rem;">Atención</small>
+                        <div class="report-heading">
+                            <span class="section-icon">${icon('alert')}</span>
+                            <div class="report-title-wrap">
+                                <h3 class="report-title">Alertas importantes</h3>
+                                <div class="report-subtitle">Puntos que requieren atención</div>
+                            </div>
+                        </div>
+                        <span class="report-tag">Atención</span>
                     </div>
                     <div class="report-body" id="alertas-container">
-                        <div style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding:8px;">Revisando...</div>
+                        <div class="state-card"><span class="state-icon">${icon('empty')}</span><div><strong>Revisando información</strong>Estamos preparando tus alertas del día.</div></div>
                     </div>
                 </div>
 
                 <div class="report-section">
                     <div class="report-header">
-                        <h3 class="report-title"> ¿Cómo voy?</h3>
-                        <small style="color:var(--text-secondary);font-size:0.72rem;">Esta semana vs anterior</small>
+                        <div class="report-heading">
+                            <span class="section-icon">${icon('trend')}</span>
+                            <div class="report-title-wrap">
+                                <h3 class="report-title">¿Cómo voy?</h3>
+                                <div class="report-subtitle">Esta semana frente a la anterior</div>
+                            </div>
+                        </div>
+                        <span class="report-tag">Comparativo</span>
                     </div>
                     <div class="report-body" id="comparativo-container">
-                        <div style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding:8px;">Calculando...</div>
+                        <div class="state-card"><span class="state-icon">${icon('empty')}</span><div><strong>Calculando comparativo</strong>Estamos consolidando tu evolución semanal.</div></div>
                     </div>
                 </div>
-
             </div>
 
-            <!-- ══ FILA 3: TOP PRODUCTOS + GRÁFICA ══ -->
-            <div class="row-auto anim-stagger delay-5"
-                 style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-bottom:18px;">
-
+            <div class="section-grid row-auto anim-stagger delay-5" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));">
                 <div class="report-section">
                     <div class="report-header">
-                        <h3 class="report-title"> Lo que más se vende</h3>
-                        <small style="color:var(--text-secondary);font-size:0.72rem;">Últimos 30 días</small>
+                        <div class="report-heading">
+                            <span class="section-icon">${icon('products')}</span>
+                            <div class="report-title-wrap">
+                                <h3 class="report-title">Lo que más se vende</h3>
+                                <div class="report-subtitle">Últimos 30 días</div>
+                            </div>
+                        </div>
+                        <span class="report-tag">Top 5</span>
                     </div>
                     <div class="report-body" id="top-products-list">
-                        <div style="color:var(--text-secondary);text-align:center;padding:8px;">Calculando...</div>
+                        <div class="state-card"><span class="state-icon">${icon('empty')}</span><div><strong>Generando ranking</strong>Estamos ordenando tus productos con mejor salida.</div></div>
                     </div>
                 </div>
 
                 <div class="report-section premium-blur-container">
                     <div class="report-header">
-                        <h3 class="report-title"> Ventas últimos 7 días</h3>
+                        <div class="report-heading">
+                            <span class="section-icon">${icon('chart')}</span>
+                            <div class="report-title-wrap">
+                                <h3 class="report-title">Ventas últimos 7 días</h3>
+                                <div class="report-subtitle">Tendencia reciente de ventas y costos</div>
+                            </div>
+                        </div>
+                        <div class="chart-toolbar" aria-label="Rangos de tiempo disponibles">
+                            <span class="chart-pill is-active">7 días</span>
+                            <span class="chart-pill">30 días</span>
+                            <span class="chart-pill">Mes actual</span>
+                        </div>
                     </div>
                     ${chartOverlay}
-                    <div class="${chartBlurClass}" style="padding:14px;">
-                        <div class="chart-container" style="position:relative;height:240px;">
+                    <div class="${chartBlurClass}" style="padding:18px 20px 20px;">
+                        <div class="chart-container" style="position:relative;height:280px;">
                             <canvas id="salesChart"></canvas>
                         </div>
                     </div>
                 </div>
-
             </div>
 
-            <!-- ══ FILA 4: DEUDA + STOCK MUERTO ══ -->
-            <div class="row-auto anim-stagger delay-6"
-                 style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-bottom:18px;">
-
+            <div class="section-grid row-auto anim-stagger delay-6" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));">
                 <div class="report-section">
                     <div class="report-header">
-                        <h3 class="report-title"> Clientes que te deben</h3>
-                        <small style="color:var(--text-secondary);font-size:0.72rem;">Por cobrar</small>
+                        <div class="report-heading">
+                            <span class="section-icon">${icon('debt')}</span>
+                            <div class="report-title-wrap">
+                                <h3 class="report-title">Clientes que te deben</h3>
+                                <div class="report-subtitle">Seguimiento de saldos pendientes</div>
+                            </div>
+                        </div>
+                        <span class="report-tag">Por cobrar</span>
                     </div>
                     <div class="report-body" id="deudores-container">
-                        <div style="color:var(--text-secondary);text-align:center;padding:8px;">Consultando...</div>
+                        <div class="state-card"><span class="state-icon">${icon('empty')}</span><div><strong>Consultando saldos</strong>Estamos trayendo la cartera pendiente.</div></div>
                     </div>
                 </div>
 
                 <div class="report-section">
                     <div class="report-header">
-                        <h3 class="report-title"> Productos sin movimiento</h3>
-                        <small style="color:var(--text-secondary);font-size:0.72rem;">Sin ventas en 30 días</small>
+                        <div class="report-heading">
+                            <span class="section-icon">${icon('slow')}</span>
+                            <div class="report-title-wrap">
+                                <h3 class="report-title">Productos sin movimiento</h3>
+                                <div class="report-subtitle">Sin ventas en los últimos 30 días</div>
+                            </div>
+                        </div>
+                        <span class="report-tag">Rotación</span>
                     </div>
                     <div class="report-body" id="dead-stock-container">
-                        <div style="color:var(--text-secondary);text-align:center;padding:8px;">Analizando...</div>
+                        <div class="state-card"><span class="state-icon">${icon('empty')}</span><div><strong>Analizando inventario</strong>Estamos detectando productos con baja rotación.</div></div>
                     </div>
                 </div>
-
             </div>
 
-            <!-- ══ FILA 5: STOCK BAJO ══ -->
             <div class="report-section anim-stagger delay-7" style="margin-bottom:30px;">
                 <div class="report-header">
-                    <h3 class="report-title">⚠️ Productos que se están acabando</h3>
-                    <small style="color:var(--text-secondary);font-size:0.72rem;">Surtir pronto</small>
+                    <div class="report-heading">
+                        <span class="section-icon">${icon('stock')}</span>
+                        <div class="report-title-wrap">
+                            <h3 class="report-title">Productos que se están acabando</h3>
+                            <div class="report-subtitle">Inventario que conviene surtir pronto</div>
+                        </div>
+                    </div>
+                    <span class="report-tag">Stock bajo</span>
                 </div>
                 <div class="report-body" id="low-stock-list">
-                    <div style="color:var(--text-secondary);text-align:center;padding:8px;">Revisando inventario...</div>
+                    <div class="state-card"><span class="state-icon">${icon('empty')}</span><div><strong>Revisando inventario</strong>Estamos detectando niveles bajos de stock.</div></div>
                 </div>
             </div>
-
+            </div>
         </main>
     </div>
     `;
@@ -438,9 +1020,9 @@ export function renderDashboard() {
 // ── Setup ──────────────────────────────────────────────────────
 export async function setupDashboardLogic(router) {
 
-    Chart.defaults.color = '#94a3b8';
-    Chart.defaults.borderColor = 'rgba(51,65,85,0.5)';
-    Chart.defaults.font.family = "'Montserrat', sans-serif";
+    Chart.defaults.color = '#90a2bf';
+    Chart.defaults.borderColor = 'rgba(148, 163, 184, 0.18)';
+    Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
     Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,23,42,0.9)';
     Chart.defaults.plugins.tooltip.padding = 10;
     Chart.defaults.plugins.tooltip.cornerRadius = 8;
@@ -602,10 +1184,10 @@ export async function setupDashboardLogic(router) {
         if (agotados.length === 0 && stockBajo.length === 0 && ventasHoy.length > 0) alertas.push({ tipo: 'ok', icon: '✅', texto: `¡Todo en orden! Llevas ${ventasHoy.length} venta${ventasHoy.length > 1 ? 's' : ''} hoy.` });
 
         el.innerHTML = alertas.length === 0
-            ? `<div class="alert-row alert-ok">✅ Sin alertas. ¡Todo bien!</div>`
+            ? `<div class="state-card" style="border-style:solid;color:#c7f0df;background:rgba(36,180,126,.08);border-color:rgba(36,180,126,.18);"><span class="state-icon">${icon('alert')}</span><div><strong>Sin alertas por ahora</strong>Todo se ve en orden en tu operación de hoy.</div></div>`
             : alertas.map(a => `
                 <div class="alert-row ${a.tipo === 'critical' ? 'alert-critical' : a.tipo === 'warning' ? 'alert-warning' : 'alert-ok'}">
-                    <span style="font-size:1.1rem;flex-shrink:0;">${a.icon}</span>
+                    <span class="state-icon">${icon('alert')}</span>
                     <span>${a.texto}</span>
                 </div>`).join('');
     }
@@ -652,8 +1234,8 @@ export async function setupDashboardLogic(router) {
                     ${trendIcon(thisWeekTxn, lastWeekTxn)}
                 </div>
             </div>
-            <div style="margin-top:10px;padding:9px 12px;background:var(--bg-input);border-radius:9px;font-size:0.78rem;color:var(--text-secondary);">
-                Semana pasada: <strong style="color:var(--text-primary);">${fmt(lastWeekSales)}</strong> en ${lastWeekTxn} ventas
+            <div class="comparison-summary">
+                Semana pasada: <strong style="color:var(--dash-text);">${fmt(lastWeekSales)}</strong> en ${lastWeekTxn} ventas
             </div>`;
     }
 
@@ -677,10 +1259,10 @@ export async function setupDashboardLogic(router) {
             });
         });
         const sorted = Object.entries(countsById).sort((a, b) => b[1] - a[1]).slice(0, 5);
-        if (sorted.length === 0) { el.innerHTML = `<div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:0.85rem;">Sin ventas suficientes aún.</div>`; return; }
+        if (sorted.length === 0) { el.innerHTML = `<div class="state-card"><span class="state-icon">${icon('products')}</span><div><strong>Aún no hay suficientes ventas</strong>En cuanto se registren más movimientos verás aquí el ranking.</div></div>`; return; }
         const maxQty  = sorted[0][1];
-        const colors  = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'];
-        const medals  = ['🥇','🥈','🥉','4°','5°'];
+        const colors  = ['#74a7ff','#46c893','#ebc16c','#e48b92','#9b8cff'];
+        const medals  = ['1','2','3','4','5'];
         el.innerHTML = sorted.map(([key, qty], idx) => {
             const name = nameById[key] || key.replace('n:','');
             const pct  = Math.round((qty / maxQty) * 100);
@@ -691,7 +1273,7 @@ export async function setupDashboardLogic(router) {
                     <div class="rank-name">${name}</div>
                     <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${pct}%;background:${colors[idx]};"></div></div>
                 </div>
-                <div class="rank-qty" style="color:${colors[idx]};">${fmtNum(qty)} <span style="font-size:0.72rem;font-weight:400;color:var(--text-secondary);">uds</span></div>
+                <div class="rank-qty" style="color:${colors[idx]};">${fmtNum(qty)} <span style="font-size:0.72rem;font-weight:500;color:var(--dash-text-muted);">uds</span></div>
             </div>`;
         }).join('');
     }
@@ -707,7 +1289,7 @@ export async function setupDashboardLogic(router) {
                 .from('customer_charges')
                 .select('customer_id, type, amount, customers(name, phone)')
                 .eq('user_id', user.id);
-            if (error) { el.innerHTML = `<div class="alert-row alert-ok">✅ Activa el módulo de Clientes para ver deudas.</div>`; return; }
+            if (error) { el.innerHTML = `<div class="state-card"><span class="state-icon">${icon('debt')}</span><div><strong>Módulo de clientes no disponible</strong>Actívalo para ver las deudas por cobrar.</div></div>`; return; }
             const clientMap = {};
             (charges || []).forEach(c => {
                 const cid = c.customer_id;
@@ -716,22 +1298,22 @@ export async function setupDashboardLogic(router) {
             });
             const deudores    = Object.values(clientMap).filter(c => c.balance > 0.5).sort((a,b) => b.balance - a.balance).slice(0,5);
             const totalDeuda  = Object.values(clientMap).reduce((acc, c) => acc + (c.balance > 0 ? c.balance : 0), 0);
-            if (deudores.length === 0) { el.innerHTML = `<div class="alert-row alert-ok">✅ Ningún cliente tiene deuda. ¡Excelente!</div>`; return; }
+            if (deudores.length === 0) { el.innerHTML = `<div class="state-card" style="border-style:solid;color:#c7f0df;background:rgba(36,180,126,.08);border-color:rgba(36,180,126,.18);"><span class="state-icon">${icon('debt')}</span><div><strong>Sin deuda pendiente</strong>Ningún cliente tiene saldo por cobrar en este momento.</div></div>`; return; }
             el.innerHTML = `
-                <div style="background:rgba(239,68,68,.07);border-radius:9px;padding:9px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-                    <span style="font-size:0.82rem;color:var(--text-secondary);">Total por cobrar</span>
-                    <strong style="color:#ef4444;font-size:1rem;">${fmt(totalDeuda)}</strong>
+                <div class="debt-summary">
+                    <span class="summary-label">Total por cobrar</span>
+                    <strong class="summary-value" style="color:#ffd4d7;">${fmt(totalDeuda)}</strong>
                 </div>
                 ${deudores.map(c => `
                 <div class="debt-client-row">
                     <div>
-                        <div style="font-weight:700;color:var(--text-primary);font-size:0.88rem;">${c.name}</div>
-                        ${c.phone ? `<div style="font-size:0.75rem;color:var(--text-secondary);">${c.phone}</div>` : ''}
+                        <div style="font-weight:600;color:var(--dash-text);font-size:0.92rem;">${c.name}</div>
+                        ${c.phone ? `<div style="font-size:0.78rem;color:var(--dash-text-muted);">${c.phone}</div>` : ''}
                     </div>
-                    <div style="font-weight:800;color:#ef4444;">${fmt(c.balance)}</div>
+                    <div style="font-weight:700;color:#ffd4d7;">${fmt(c.balance)}</div>
                 </div>`).join('')}`;
         } catch (e) {
-            el.innerHTML = `<div style="color:var(--text-secondary);font-size:0.82rem;text-align:center;padding:8px;">Activa el módulo de Clientes.</div>`;
+            el.innerHTML = `<div class="state-card"><span class="state-icon">${icon('debt')}</span><div><strong>No fue posible consultar clientes</strong>Activa el módulo de clientes para usar este panel.</div></div>`;
         }
     }
 
@@ -751,19 +1333,20 @@ export async function setupDashboardLogic(router) {
             });
         });
         const dead = (products || []).filter(p => Number(p.stock) > 0 && !soldIds.has(String(p.id)) && !soldIds.has(`name:${p.name}`)).slice(0, 5);
-        if (dead.length === 0) { el.innerHTML = `<div class="alert-row alert-ok">✅ Todos los productos han tenido movimiento. ¡Bien!</div>`; return; }
+        if (dead.length === 0) { el.innerHTML = `<div class="state-card" style="border-style:solid;color:#c7f0df;background:rgba(36,180,126,.08);border-color:rgba(36,180,126,.18);"><span class="state-icon">${icon('slow')}</span><div><strong>Todo tu inventario se está moviendo</strong>No hay productos con stock detenido en los últimos 30 días.</div></div>`; return; }
         const totalCapital = dead.reduce((acc, p) => acc + (Number(p.cost_price || 0) * Number(p.stock)), 0);
         el.innerHTML = `
-            <div style="background:rgba(245,158,11,.08);border-radius:9px;padding:9px 12px;margin-bottom:12px;font-size:0.82rem;color:#f59e0b;font-weight:700;">
-                ≈ ${fmt(totalCapital)} parado en estos productos
+            <div class="capital-summary">
+                <span class="summary-label">Capital inmovilizado estimado</span>
+                <strong class="summary-value" style="color:#f4dfae;">${fmt(totalCapital)}</strong>
             </div>
             ${dead.map(p => `
             <div class="dead-item">
                 <div>
-                    <div style="font-weight:700;color:var(--text-primary);">${p.name}</div>
-                    <div style="font-size:0.72rem;color:var(--text-secondary);">Stock: ${p.stock} · Costo: ${fmt(p.cost_price || 0)}</div>
+                    <div style="font-weight:600;color:var(--dash-text);">${p.name}</div>
+                    <div style="font-size:0.76rem;color:var(--dash-text-muted);">Stock: ${p.stock} · Costo: ${fmt(p.cost_price || 0)}</div>
                 </div>
-                <span style="font-size:0.75rem;background:rgba(245,158,11,.1);color:#f59e0b;padding:2px 9px;border-radius:20px;font-weight:700;white-space:nowrap;">Sin ventas</span>
+                <span class="status-pill" style="background:rgba(213,164,71,.12);color:#f4dfae;">Sin ventas</span>
             </div>`).join('')}`;
     }
 
@@ -772,18 +1355,19 @@ export async function setupDashboardLogic(router) {
         const el = document.getElementById('low-stock-list');
         if (!el) return;
         const low = (products || []).filter(p => !isNaN(Number(p.stock)) && Number(p.stock) <= 10).sort((a,b) => Number(a.stock) - Number(b.stock)).slice(0, 10);
-        if (low.length === 0) { el.innerHTML = `<div class="alert-row alert-ok">✅ Todo el inventario tiene stock suficiente.</div>`; return; }
+        if (low.length === 0) { el.innerHTML = `<div class="state-card" style="border-style:solid;color:#c7f0df;background:rgba(36,180,126,.08);border-color:rgba(36,180,126,.18);"><span class="state-icon">${icon('stock')}</span><div><strong>Inventario en buen nivel</strong>Todo el stock actual se encuentra dentro de rangos saludables.</div></div>`; return; }
         el.innerHTML = `
-            <div class="low-stock-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">
+            <div class="low-stock-grid">
                 ${low.map(p => {
                     const stock      = Number(p.stock);
                     const isCritical = stock <= 0;
-                    const color      = isCritical ? '#ef4444' : '#f59e0b';
-                    const bg         = isCritical ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)';
+                    const color      = isCritical ? '#ffd4d7' : '#f4dfae';
+                    const bg         = isCritical ? 'rgba(228,108,117,.08)' : 'rgba(213,164,71,.08)';
+                    const border     = isCritical ? 'rgba(228,108,117,.18)' : 'rgba(213,164,71,.18)';
                     return `
-                    <div style="padding:10px 12px;border-radius:9px;background:${bg};border:1px solid ${color}33;display:flex;justify-content:space-between;align-items:center;gap:6px;">
-                        <span style="font-size:0.83rem;font-weight:700;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</span>
-                        <span style="font-size:0.77rem;font-weight:800;color:${color};white-space:nowrap;">${isCritical ? '🚫 Agotado' : stock + ' uds'}</span>
+                    <div class="low-stock-card" style="background:${bg};border-color:${border};">
+                        <span style="font-size:0.86rem;font-weight:600;color:var(--dash-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</span>
+                        <span class="status-pill" style="background:rgba(255,255,255,.05);color:${color};">${isCritical ? 'Agotado' : stock + ' uds'}</span>
                     </div>`;
                 }).join('')}
             </div>`;
@@ -835,10 +1419,10 @@ export async function setupDashboardLogic(router) {
             }
         }
         const ctx    = canvas.getContext('2d');
-        const gSales = ctx.createLinearGradient(0, 0, 0, 260);
-        gSales.addColorStop(0, 'rgba(59,130,246,.45)'); gSales.addColorStop(1, 'rgba(59,130,246,0)');
-        const gCosts = ctx.createLinearGradient(0, 0, 0, 260);
-        gCosts.addColorStop(0, 'rgba(239,68,68,.25)');  gCosts.addColorStop(1, 'rgba(239,68,68,0)');
+        const gSales = ctx.createLinearGradient(0, 0, 0, 280);
+        gSales.addColorStop(0, 'rgba(116,167,255,.28)'); gSales.addColorStop(1, 'rgba(116,167,255,0)');
+        const gCosts = ctx.createLinearGradient(0, 0, 0, 280);
+        gCosts.addColorStop(0, 'rgba(228,108,117,.18)');  gCosts.addColorStop(1, 'rgba(228,108,117,0)');
         const maxValue      = Math.max(...salesData, ...costsData, 0);
         const yTickCallback = (v) => {
             if (maxValue >= 1000000) return `$${(v/1000000).toFixed(1)}M`;
@@ -851,8 +1435,8 @@ export async function setupDashboardLogic(router) {
             data: {
                 labels,
                 datasets: [
-                    { label: 'Lo que vendí',    data: salesData, borderColor:'#3b82f6', backgroundColor: gSales, borderWidth:3, tension:.4, fill:true, pointBackgroundColor:'#fff', pointHoverRadius:5 },
-                    { label: 'Lo que me costó', data: costsData, borderColor:'#ef4444', backgroundColor: gCosts, borderWidth:2, borderDash:[5,5], tension:.4, fill:true, pointBackgroundColor:'#fff' }
+                    { label: 'Lo que vendí',    data: salesData, borderColor:'#74a7ff', backgroundColor: gSales, borderWidth:3, tension:.38, fill:true, pointBackgroundColor:'#74a7ff', pointBorderColor:'#08111f', pointBorderWidth:2, pointRadius:3, pointHoverRadius:5 },
+                    { label: 'Lo que me costó', data: costsData, borderColor:'#e48b92', backgroundColor: gCosts, borderWidth:2, borderDash:[6,5], tension:.38, fill:true, pointBackgroundColor:'#e48b92', pointBorderColor:'#08111f', pointBorderWidth:2, pointRadius:3 }
                 ]
             },
             options: {
@@ -860,11 +1444,18 @@ export async function setupDashboardLogic(router) {
                 interaction: { mode:'index', intersect:false },
                 animation:   { duration:1400, easing:'easeOutQuart' },
                 scales: {
-                    y: { beginAtZero:true, grid:{ color:'rgba(148,163,184,.1)' }, ticks:{ maxTicksLimit:5, callback: yTickCallback } },
-                    x: { grid:{ display:false } }
+                    y: {
+                        beginAtZero:true,
+                        grid:{ color:'rgba(148,163,184,.12)' },
+                        ticks:{ maxTicksLimit:5, callback: yTickCallback, padding: 10, font:{ size: 12, weight: '500' } }
+                    },
+                    x: {
+                        grid:{ display:false },
+                        ticks:{ padding: 8, font:{ size: 12, weight: '500' } }
+                    }
                 },
                 plugins: {
-                    legend: { position:'top', align:'end', labels:{ boxWidth:12, font:{ size:11 } } },
+                    legend: { position:'top', align:'end', labels:{ usePointStyle: true, pointStyle: 'circle', boxWidth:10, boxHeight:10, padding:16, font:{ size:12, weight:'600' } } },
                     tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } }
                 }
             }
