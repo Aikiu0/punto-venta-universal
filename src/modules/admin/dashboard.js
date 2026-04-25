@@ -58,6 +58,65 @@ function animateValue(id, start, end, duration, isCurrency = true) {
 const fmt    = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
 const fmtNum = (n) => Number(n || 0).toLocaleString('es-MX');
 
+function getDashboardPalette() {
+    const root = document.documentElement;
+    const isDark = root.getAttribute('data-theme') === 'dark';
+
+    return isDark
+        ? {
+            textMuted: '#90a2bf',
+            border: 'rgba(148, 163, 184, 0.18)',
+            grid: 'rgba(148, 163, 184, 0.12)',
+            salesLine: '#74a7ff',
+            salesFillStart: 'rgba(116,167,255,.28)',
+            salesFillEnd: 'rgba(116,167,255,0)',
+            costLine: '#e48b92',
+            costFillStart: 'rgba(228,108,117,.18)',
+            costFillEnd: 'rgba(228,108,117,0)',
+            pointBorder: '#08111f'
+        }
+        : {
+            textMuted: '#5f7492',
+            border: 'rgba(148, 163, 184, 0.22)',
+            grid: 'rgba(148, 163, 184, 0.18)',
+            salesLine: '#4f7cff',
+            salesFillStart: 'rgba(79,124,255,.22)',
+            salesFillEnd: 'rgba(79,124,255,0)',
+            costLine: '#d56b76',
+            costFillStart: 'rgba(213,107,118,.15)',
+            costFillEnd: 'rgba(213,107,118,0)',
+            pointBorder: '#f4f7fb'
+        };
+}
+
+function applyChartTheme(chart) {
+    if (!chart) return;
+    const palette = getDashboardPalette();
+    const ctx = chart.canvas.getContext('2d');
+    const salesGradient = ctx.createLinearGradient(0, 0, 0, 280);
+    salesGradient.addColorStop(0, palette.salesFillStart);
+    salesGradient.addColorStop(1, palette.salesFillEnd);
+    const costGradient = ctx.createLinearGradient(0, 0, 0, 280);
+    costGradient.addColorStop(0, palette.costFillStart);
+    costGradient.addColorStop(1, palette.costFillEnd);
+
+    Chart.defaults.color = palette.textMuted;
+    Chart.defaults.borderColor = palette.border;
+
+    chart.data.datasets[0].borderColor = palette.salesLine;
+    chart.data.datasets[0].backgroundColor = salesGradient;
+    chart.data.datasets[0].pointBackgroundColor = palette.salesLine;
+    chart.data.datasets[0].pointBorderColor = palette.pointBorder;
+
+    chart.data.datasets[1].borderColor = palette.costLine;
+    chart.data.datasets[1].backgroundColor = costGradient;
+    chart.data.datasets[1].pointBackgroundColor = palette.costLine;
+    chart.data.datasets[1].pointBorderColor = palette.pointBorder;
+
+    chart.options.scales.y.grid.color = palette.grid;
+    chart.update();
+}
+
 function getSaludo() {
     const h = new Date().getHours();
     if (h < 12) return 'Buenos días';
@@ -87,6 +146,32 @@ export function renderDashboard() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
         .dashboard-shell {
+            --dash-bg: #eef3f9;
+            --dash-surface: #ffffff;
+            --dash-surface-soft: #f7f9fc;
+            --dash-surface-elevated: #edf2f8;
+            --dash-border: rgba(148, 163, 184, 0.2);
+            --dash-border-strong: rgba(148, 163, 184, 0.3);
+            --dash-text: #18273b;
+            --dash-text-muted: #5f7492;
+            --dash-text-soft: #7e91aa;
+            --dash-brand: #7c6cf2;
+            --dash-brand-soft: rgba(124, 108, 242, 0.14);
+            --dash-success: #24b47e;
+            --dash-warning: #d5a447;
+            --dash-danger: #e46c75;
+            --dash-success-strong: #177a56;
+            --dash-warning-strong: #9a6a12;
+            --dash-danger-strong: #b84753;
+            --dash-neutral-strong: #50657f;
+            --dash-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+            --dash-radius-lg: 24px;
+            --dash-radius-md: 18px;
+            --dash-radius-sm: 14px;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        [data-theme="dark"] .dashboard-shell {
             --dash-bg: #08111f;
             --dash-surface: #0f1b2d;
             --dash-surface-soft: #13233a;
@@ -96,23 +181,18 @@ export function renderDashboard() {
             --dash-text: #e5eefc;
             --dash-text-muted: #90a2bf;
             --dash-text-soft: #6f839f;
-            --dash-brand: #7c6cf2;
-            --dash-brand-soft: rgba(124, 108, 242, 0.14);
-            --dash-success: #24b47e;
-            --dash-warning: #d5a447;
-            --dash-danger: #e46c75;
             --dash-shadow: 0 20px 45px rgba(2, 6, 23, 0.32);
-            --dash-radius-lg: 24px;
-            --dash-radius-md: 18px;
-            --dash-radius-sm: 14px;
-            font-family: 'Inter', system-ui, sans-serif;
+            --dash-success-strong: #c7f0df;
+            --dash-warning-strong: #f4dfae;
+            --dash-danger-strong: #ffd4d7;
+            --dash-neutral-strong: #c7d2e3;
         }
 
         .dashboard-shell.admin-container {
             grid-template-columns: minmax(248px, 280px) 1fr;
             background:
-                radial-gradient(circle at top right, rgba(124, 108, 242, 0.12), transparent 22%),
-                radial-gradient(circle at bottom left, rgba(36, 180, 126, 0.08), transparent 18%),
+                radial-gradient(circle at top right, rgba(124, 108, 242, 0.1), transparent 22%),
+                radial-gradient(circle at bottom left, rgba(36, 180, 126, 0.06), transparent 18%),
                 var(--dash-bg);
             color: var(--dash-text);
             font-family: 'Inter', system-ui, sans-serif;
@@ -125,8 +205,14 @@ export function renderDashboard() {
             padding: 22px 18px 18px;
             border-right: 1px solid var(--dash-border);
             background:
-                linear-gradient(180deg, rgba(19, 35, 58, 0.96), rgba(9, 18, 31, 0.98));
+                linear-gradient(180deg, rgba(243, 247, 252, 0.98), rgba(233, 239, 247, 0.98));
             backdrop-filter: blur(18px);
+            box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.5);
+        }
+
+        [data-theme="dark"] .dashboard-shell .admin-sidebar {
+            background:
+                linear-gradient(180deg, rgba(19, 35, 58, 0.96), rgba(9, 18, 31, 0.98));
             box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03);
         }
 
@@ -139,6 +225,11 @@ export function renderDashboard() {
             margin-bottom: 12px !important;
             border-radius: 22px;
             border: 1px solid rgba(148, 163, 184, 0.12);
+            background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.48)) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 16px 30px rgba(148, 163, 184, 0.12) !important;
+        }
+
+        [data-theme="dark"] .dashboard-shell #sidebar-header-root {
             background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)) !important;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 30px rgba(2, 6, 23, 0.2) !important;
         }
@@ -148,8 +239,12 @@ export function renderDashboard() {
             height: 60px !important;
             border-radius: 18px !important;
             border: 1px solid rgba(148, 163, 184, 0.16) !important;
-            background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)) !important;
+            background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(241,245,249,0.9)) !important;
             box-shadow: none !important;
+        }
+
+        [data-theme="dark"] .dashboard-shell .premium-glass-container {
+            background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)) !important;
         }
 
         .dashboard-shell #sb-real-name {
@@ -182,29 +277,48 @@ export function renderDashboard() {
         }
 
         .dashboard-shell .menu-item:hover {
-            background: rgba(255,255,255,0.04);
+            background: rgba(255,255,255,0.48);
             border-color: rgba(148, 163, 184, 0.12);
             color: var(--dash-text);
             transform: translateX(2px);
         }
 
+        [data-theme="dark"] .dashboard-shell .menu-item:hover {
+            background: rgba(255,255,255,0.04);
+        }
+
         .dashboard-shell .menu-item.active {
-            background: linear-gradient(180deg, rgba(124, 108, 242, 0.16), rgba(124, 108, 242, 0.08));
+            background: linear-gradient(180deg, rgba(124, 108, 242, 0.12), rgba(124, 108, 242, 0.05));
             border-color: rgba(124, 108, 242, 0.28);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+            color: #20194d;
+        }
+
+        [data-theme="dark"] .dashboard-shell .menu-item.active {
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
             color: #f8fbff;
         }
 
         .dashboard-shell .menu-item.logout {
             margin-top: auto;
-            color: #f1b3b7;
-            background: rgba(228, 108, 117, 0.06);
+            color: #b9525d;
+            background: rgba(228, 108, 117, 0.08);
             border-color: rgba(228, 108, 117, 0.12);
         }
 
         .dashboard-shell .menu-item.logout:hover {
-            background: rgba(228, 108, 117, 0.12);
+            background: rgba(228, 108, 117, 0.14);
             border-color: rgba(228, 108, 117, 0.2);
+            color: #9f2f3c;
+        }
+
+        [data-theme="dark"] .dashboard-shell .menu-item.logout {
+            color: #f1b3b7;
+            background: rgba(228, 108, 117, 0.06);
+        }
+
+        [data-theme="dark"] .dashboard-shell .menu-item.logout:hover {
+            background: rgba(228, 108, 117, 0.12);
             color: #ffd2d6;
         }
 
@@ -257,7 +371,7 @@ export function renderDashboard() {
 
         .saludo-bar {
             background:
-                linear-gradient(180deg, rgba(20, 33, 53, 0.94), rgba(12, 23, 39, 0.94)),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 247, 251, 0.94)),
                 linear-gradient(90deg, rgba(124, 108, 242, 0.12), transparent);
             border: 1px solid var(--dash-border);
             box-shadow: var(--dash-shadow);
@@ -269,6 +383,12 @@ export function renderDashboard() {
             align-items: center;
             gap: 18px;
             margin-bottom: 18px;
+        }
+
+        [data-theme="dark"] .dashboard-shell .saludo-bar {
+            background:
+                linear-gradient(180deg, rgba(20, 33, 53, 0.94), rgba(12, 23, 39, 0.94)),
+                linear-gradient(90deg, rgba(124, 108, 242, 0.12), transparent);
         }
 
         .saludo-meta {
@@ -313,7 +433,7 @@ export function renderDashboard() {
             justify-content: center;
             border-radius: 14px;
             border: 1px solid rgba(148, 163, 184, 0.14);
-            background: rgba(255, 255, 255, 0.04);
+            background: rgba(255, 255, 255, 0.62);
             color: var(--dash-text);
             cursor: pointer;
             transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
@@ -322,8 +442,18 @@ export function renderDashboard() {
         .ghost-action:hover,
         .dash-hamburger:hover {
             transform: translateY(-1px);
-            background: rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.95);
             border-color: rgba(148, 163, 184, 0.22);
+        }
+
+        [data-theme="dark"] .dashboard-shell .ghost-action,
+        [data-theme="dark"] .dashboard-shell .dash-hamburger {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        [data-theme="dark"] .dashboard-shell .ghost-action:hover,
+        [data-theme="dark"] .dashboard-shell .dash-hamburger:hover {
+            background: rgba(255,255,255,0.08);
         }
 
         .action-icon {
@@ -339,8 +469,12 @@ export function renderDashboard() {
             position: sticky;
             top: 0;
             z-index: 100;
-            background: linear-gradient(180deg, rgba(8, 17, 31, 0.96) 75%, rgba(8, 17, 31, 0));
+            background: linear-gradient(180deg, rgba(238, 243, 249, 0.96) 75%, rgba(238, 243, 249, 0));
             backdrop-filter: blur(10px);
+        }
+
+        [data-theme="dark"] .dashboard-shell .dash-topbar {
+            background: linear-gradient(180deg, rgba(8, 17, 31, 0.96) 75%, rgba(8, 17, 31, 0));
         }
 
         .dash-topbar-title {
@@ -364,9 +498,13 @@ export function renderDashboard() {
             padding: 20px;
             border-radius: var(--dash-radius-md);
             border: 1px solid var(--dash-border);
-            background: linear-gradient(180deg, rgba(18, 31, 50, 0.94), rgba(11, 22, 36, 0.94));
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(247, 250, 252, 0.96));
             box-shadow: var(--dash-shadow);
             transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+        }
+
+        [data-theme="dark"] .dashboard-shell .kpi-card {
+            background: linear-gradient(180deg, rgba(18, 31, 50, 0.94), rgba(11, 22, 36, 0.94));
         }
 
         .kpi-card:hover {
@@ -384,8 +522,12 @@ export function renderDashboard() {
             justify-content: center;
             margin-bottom: 18px;
             border: 1px solid currentColor;
-            background: rgba(255,255,255,0.04);
+            background: rgba(124, 108, 242, 0.06);
             opacity: 0.95;
+        }
+
+        [data-theme="dark"] .dashboard-shell .kpi-accent {
+            background: rgba(255,255,255,0.04);
         }
 
         .metric-icon {
@@ -419,12 +561,16 @@ export function renderDashboard() {
         }
 
         .report-section {
-            background: linear-gradient(180deg, rgba(18, 31, 50, 0.96), rgba(11, 22, 36, 0.96));
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 252, 0.98));
             border: 1px solid var(--dash-border);
             border-radius: var(--dash-radius-md);
             overflow: hidden;
             box-shadow: var(--dash-shadow);
             transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+        }
+
+        [data-theme="dark"] .dashboard-shell .report-section {
+            background: linear-gradient(180deg, rgba(18, 31, 50, 0.96), rgba(11, 22, 36, 0.96));
         }
 
         .report-section:hover {
@@ -457,9 +603,13 @@ export function renderDashboard() {
             align-items: center;
             justify-content: center;
             border-radius: 12px;
-            background: rgba(255,255,255,0.04);
+            background: rgba(124, 108, 242, 0.06);
             color: var(--dash-text-muted);
             border: 1px solid rgba(148, 163, 184, 0.14);
+        }
+
+        [data-theme="dark"] .dashboard-shell .section-icon {
+            background: rgba(255,255,255,0.04);
         }
 
         .report-title-wrap {
@@ -487,8 +637,12 @@ export function renderDashboard() {
             padding: 8px 12px;
             border-radius: 999px;
             border: 1px solid rgba(148, 163, 184, 0.14);
-            background: rgba(255,255,255,0.03);
+            background: rgba(255,255,255,0.56);
             font-weight: 600;
+        }
+
+        [data-theme="dark"] .dashboard-shell .report-tag {
+            background: rgba(255,255,255,0.03);
         }
 
         .report-body {
@@ -507,9 +661,9 @@ export function renderDashboard() {
             border: 1px solid transparent;
         }
         .alert-row:last-child { margin-bottom: 0; }
-        .alert-critical { background:rgba(228,108,117,.12);  border-color:rgba(228,108,117,.22);  color:#ffd4d7; }
-        .alert-warning  { background:rgba(213,164,71,.11); border-color:rgba(213,164,71,.22); color:#f4dfae; }
-        .alert-ok       { background:rgba(36,180,126,.12); border-color:rgba(36,180,126,.2); color:#c7f0df; }
+        .alert-critical { background:rgba(228,108,117,.12);  border-color:rgba(228,108,117,.22);  color:var(--dash-danger-strong); }
+        .alert-warning  { background:rgba(213,164,71,.11); border-color:rgba(213,164,71,.22); color:var(--dash-warning-strong); }
+        .alert-ok       { background:rgba(36,180,126,.12); border-color:rgba(36,180,126,.2); color:var(--dash-success-strong); }
 
         .state-icon {
             width: 18px;
@@ -525,9 +679,13 @@ export function renderDashboard() {
             padding: 16px;
             border-radius: 16px;
             border: 1px dashed rgba(148, 163, 184, 0.2);
-            background: rgba(255,255,255,0.02);
+            background: rgba(255,255,255,0.5);
             color: var(--dash-text-muted);
             font-size: 0.9rem;
+        }
+
+        [data-theme="dark"] .dashboard-shell .state-card {
+            background: rgba(255,255,255,0.02);
         }
 
         .state-card strong {
@@ -535,6 +693,27 @@ export function renderDashboard() {
             color: var(--dash-text);
             font-weight: 600;
             margin-bottom: 4px;
+        }
+
+        .state-card-success {
+            border-style: solid;
+            color: var(--dash-success-strong);
+            background: rgba(36,180,126,.08);
+            border-color: rgba(36,180,126,.18);
+        }
+
+        .state-card-warning {
+            border-style: solid;
+            color: var(--dash-warning-strong);
+            background: rgba(213,164,71,.08);
+            border-color: rgba(213,164,71,.18);
+        }
+
+        .state-card-danger {
+            border-style: solid;
+            color: var(--dash-danger-strong);
+            background: rgba(228,108,117,.08);
+            border-color: rgba(228,108,117,.18);
         }
 
         .compare-row {
@@ -550,17 +729,21 @@ export function renderDashboard() {
         .compare-values  { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
         .compare-current { font-weight: 700; font-size: 1rem; color: var(--dash-text); letter-spacing: -0.02em; }
         .trend-badge     { padding: 5px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; }
-        .trend-up   { background:rgba(36,180,126,.14); color:#bcf0d7; }
-        .trend-down { background:rgba(228,108,117,.14); color:#ffd4d7; }
-        .trend-flat { background:rgba(148,163,184,.12); color:#c7d2e3; }
+        .trend-up   { background:rgba(36,180,126,.14); color:var(--dash-success-strong); }
+        .trend-down { background:rgba(228,108,117,.14); color:var(--dash-danger-strong); }
+        .trend-flat { background:rgba(148,163,184,.12); color:var(--dash-neutral-strong); }
         .comparison-summary {
             margin-top: 14px;
             padding: 13px 14px;
             border-radius: 14px;
-            background: rgba(255,255,255,0.03);
+            background: rgba(255,255,255,0.48);
             border: 1px solid var(--dash-border);
             font-size: 0.82rem;
             color: var(--dash-text-muted);
+        }
+
+        [data-theme="dark"] .dashboard-shell .comparison-summary {
+            background: rgba(255,255,255,0.03);
         }
 
         .product-rank-item {
@@ -640,6 +823,16 @@ export function renderDashboard() {
             letter-spacing: -0.02em;
         }
 
+        .summary-value-danger { color: var(--dash-danger-strong); }
+        .summary-value-warning { color: var(--dash-warning-strong); }
+        .text-danger-strong { color: var(--dash-danger-strong); }
+        .text-warning-strong { color: var(--dash-warning-strong); }
+
+        .status-pill-warning {
+            background: rgba(213,164,71,.12);
+            color: var(--dash-warning-strong);
+        }
+
         .dead-item {
             display: flex;
             justify-content: space-between;
@@ -691,7 +884,7 @@ export function renderDashboard() {
             padding: 7px 12px;
             border-radius: 999px;
             border: 1px solid rgba(148, 163, 184, 0.14);
-            background: rgba(255,255,255,0.03);
+            background: rgba(255,255,255,0.56);
             color: var(--dash-text-muted);
             font-size: 0.76rem;
             font-weight: 600;
@@ -703,15 +896,19 @@ export function renderDashboard() {
             background: rgba(124, 108, 242, 0.12);
         }
 
+        [data-theme="dark"] .dashboard-shell .chart-pill {
+            background: rgba(255,255,255,0.03);
+        }
+
         .premium-blur-container { position: relative; overflow: hidden; border-radius: 10px; }
         .premium-blur-content   { filter: blur(8px); opacity: .6; pointer-events: none; user-select: none; }
         .premium-lock-overlay {
             position: absolute; top:0; left:0; width:100%; height:100%; z-index:50;
             cursor: pointer; display: flex; flex-direction: column;
             justify-content: center; align-items: center;
-            background: rgba(8,17,31,.42); transition: background .3s;
+            background: rgba(238,243,249,.5); transition: background .3s;
         }
-        .premium-lock-overlay:hover { background: rgba(8,17,31,.54); }
+        .premium-lock-overlay:hover { background: rgba(238,243,249,.68); }
         .lock-badge {
             width: 52px;
             height: 52px;
@@ -721,16 +918,32 @@ export function renderDashboard() {
             justify-content: center;
             font-size: 1.2rem;
             margin-bottom: 10px;
-            background: rgba(255,255,255,.08);
+            background: rgba(255,255,255,.8);
             color: var(--dash-text);
         }
         .lock-text {
             font-weight: 600;
             color: var(--dash-text);
-            background: rgba(8,17,31,.7);
+            background: rgba(255,255,255,.88);
             border: 1px solid rgba(148, 163, 184, 0.14);
             padding: 8px 14px;
             border-radius: 999px;
+        }
+
+        [data-theme="dark"] .dashboard-shell .premium-lock-overlay {
+            background: rgba(8,17,31,.42);
+        }
+
+        [data-theme="dark"] .dashboard-shell .premium-lock-overlay:hover {
+            background: rgba(8,17,31,.54);
+        }
+
+        [data-theme="dark"] .dashboard-shell .lock-badge {
+            background: rgba(255,255,255,.08);
+        }
+
+        [data-theme="dark"] .dashboard-shell .lock-text {
+            background: rgba(8,17,31,.7);
         }
 
         .dash-topbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
@@ -1019,9 +1232,9 @@ export function renderDashboard() {
 
 // ── Setup ──────────────────────────────────────────────────────
 export async function setupDashboardLogic(router) {
-
-    Chart.defaults.color = '#90a2bf';
-    Chart.defaults.borderColor = 'rgba(148, 163, 184, 0.18)';
+    const initialPalette = getDashboardPalette();
+    Chart.defaults.color = initialPalette.textMuted;
+    Chart.defaults.borderColor = initialPalette.border;
     Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
     Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,23,42,0.9)';
     Chart.defaults.plugins.tooltip.padding = 10;
@@ -1041,7 +1254,10 @@ export async function setupDashboardLogic(router) {
     overlay?.addEventListener('click',  () => toggleMenu(false));
 
     // ── Tema: dos botones (escritorio y móvil) ────────────────
-    const toggleTheme = () => ThemeService.toggle();
+    const toggleTheme = () => {
+        ThemeService.toggle();
+        requestAnimationFrame(() => applyChartTheme(salesChartInstance));
+    };
     document.getElementById('theme-toggle-dash')?.addEventListener('click',        toggleTheme);
     document.getElementById('theme-toggle-dash-mobile')?.addEventListener('click', toggleTheme);
 
@@ -1184,7 +1400,7 @@ export async function setupDashboardLogic(router) {
         if (agotados.length === 0 && stockBajo.length === 0 && ventasHoy.length > 0) alertas.push({ tipo: 'ok', icon: '✅', texto: `¡Todo en orden! Llevas ${ventasHoy.length} venta${ventasHoy.length > 1 ? 's' : ''} hoy.` });
 
         el.innerHTML = alertas.length === 0
-            ? `<div class="state-card" style="border-style:solid;color:#c7f0df;background:rgba(36,180,126,.08);border-color:rgba(36,180,126,.18);"><span class="state-icon">${icon('alert')}</span><div><strong>Sin alertas por ahora</strong>Todo se ve en orden en tu operación de hoy.</div></div>`
+            ? `<div class="state-card state-card-success"><span class="state-icon">${icon('alert')}</span><div><strong>Sin alertas por ahora</strong>Todo se ve en orden en tu operación de hoy.</div></div>`
             : alertas.map(a => `
                 <div class="alert-row ${a.tipo === 'critical' ? 'alert-critical' : a.tipo === 'warning' ? 'alert-warning' : 'alert-ok'}">
                     <span class="state-icon">${icon('alert')}</span>
@@ -1298,11 +1514,11 @@ export async function setupDashboardLogic(router) {
             });
             const deudores    = Object.values(clientMap).filter(c => c.balance > 0.5).sort((a,b) => b.balance - a.balance).slice(0,5);
             const totalDeuda  = Object.values(clientMap).reduce((acc, c) => acc + (c.balance > 0 ? c.balance : 0), 0);
-            if (deudores.length === 0) { el.innerHTML = `<div class="state-card" style="border-style:solid;color:#c7f0df;background:rgba(36,180,126,.08);border-color:rgba(36,180,126,.18);"><span class="state-icon">${icon('debt')}</span><div><strong>Sin deuda pendiente</strong>Ningún cliente tiene saldo por cobrar en este momento.</div></div>`; return; }
+            if (deudores.length === 0) { el.innerHTML = `<div class="state-card state-card-success"><span class="state-icon">${icon('debt')}</span><div><strong>Sin deuda pendiente</strong>Ningún cliente tiene saldo por cobrar en este momento.</div></div>`; return; }
             el.innerHTML = `
                 <div class="debt-summary">
                     <span class="summary-label">Total por cobrar</span>
-                    <strong class="summary-value" style="color:#ffd4d7;">${fmt(totalDeuda)}</strong>
+                    <strong class="summary-value summary-value-danger">${fmt(totalDeuda)}</strong>
                 </div>
                 ${deudores.map(c => `
                 <div class="debt-client-row">
@@ -1310,7 +1526,7 @@ export async function setupDashboardLogic(router) {
                         <div style="font-weight:600;color:var(--dash-text);font-size:0.92rem;">${c.name}</div>
                         ${c.phone ? `<div style="font-size:0.78rem;color:var(--dash-text-muted);">${c.phone}</div>` : ''}
                     </div>
-                    <div style="font-weight:700;color:#ffd4d7;">${fmt(c.balance)}</div>
+                    <div class="text-danger-strong" style="font-weight:700;">${fmt(c.balance)}</div>
                 </div>`).join('')}`;
         } catch (e) {
             el.innerHTML = `<div class="state-card"><span class="state-icon">${icon('debt')}</span><div><strong>No fue posible consultar clientes</strong>Activa el módulo de clientes para usar este panel.</div></div>`;
@@ -1333,12 +1549,12 @@ export async function setupDashboardLogic(router) {
             });
         });
         const dead = (products || []).filter(p => Number(p.stock) > 0 && !soldIds.has(String(p.id)) && !soldIds.has(`name:${p.name}`)).slice(0, 5);
-        if (dead.length === 0) { el.innerHTML = `<div class="state-card" style="border-style:solid;color:#c7f0df;background:rgba(36,180,126,.08);border-color:rgba(36,180,126,.18);"><span class="state-icon">${icon('slow')}</span><div><strong>Todo tu inventario se está moviendo</strong>No hay productos con stock detenido en los últimos 30 días.</div></div>`; return; }
+        if (dead.length === 0) { el.innerHTML = `<div class="state-card state-card-success"><span class="state-icon">${icon('slow')}</span><div><strong>Todo tu inventario se está moviendo</strong>No hay productos con stock detenido en los últimos 30 días.</div></div>`; return; }
         const totalCapital = dead.reduce((acc, p) => acc + (Number(p.cost_price || 0) * Number(p.stock)), 0);
         el.innerHTML = `
             <div class="capital-summary">
                 <span class="summary-label">Capital inmovilizado estimado</span>
-                <strong class="summary-value" style="color:#f4dfae;">${fmt(totalCapital)}</strong>
+                <strong class="summary-value summary-value-warning">${fmt(totalCapital)}</strong>
             </div>
             ${dead.map(p => `
             <div class="dead-item">
@@ -1346,7 +1562,7 @@ export async function setupDashboardLogic(router) {
                     <div style="font-weight:600;color:var(--dash-text);">${p.name}</div>
                     <div style="font-size:0.76rem;color:var(--dash-text-muted);">Stock: ${p.stock} · Costo: ${fmt(p.cost_price || 0)}</div>
                 </div>
-                <span class="status-pill" style="background:rgba(213,164,71,.12);color:#f4dfae;">Sin ventas</span>
+                <span class="status-pill status-pill-warning">Sin ventas</span>
             </div>`).join('')}`;
     }
 
@@ -1355,13 +1571,16 @@ export async function setupDashboardLogic(router) {
         const el = document.getElementById('low-stock-list');
         if (!el) return;
         const low = (products || []).filter(p => !isNaN(Number(p.stock)) && Number(p.stock) <= 10).sort((a,b) => Number(a.stock) - Number(b.stock)).slice(0, 10);
-        if (low.length === 0) { el.innerHTML = `<div class="state-card" style="border-style:solid;color:#c7f0df;background:rgba(36,180,126,.08);border-color:rgba(36,180,126,.18);"><span class="state-icon">${icon('stock')}</span><div><strong>Inventario en buen nivel</strong>Todo el stock actual se encuentra dentro de rangos saludables.</div></div>`; return; }
+        if (low.length === 0) { el.innerHTML = `<div class="state-card state-card-success"><span class="state-icon">${icon('stock')}</span><div><strong>Inventario en buen nivel</strong>Todo el stock actual se encuentra dentro de rangos saludables.</div></div>`; return; }
         el.innerHTML = `
             <div class="low-stock-grid">
                 ${low.map(p => {
                     const stock      = Number(p.stock);
                     const isCritical = stock <= 0;
-                    const color      = isCritical ? '#ffd4d7' : '#f4dfae';
+                    const isDark     = document.documentElement.getAttribute('data-theme') === 'dark';
+                    const color      = isCritical
+                        ? (isDark ? '#ffd4d7' : '#b84753')
+                        : (isDark ? '#f4dfae' : '#9a6a12');
                     const bg         = isCritical ? 'rgba(228,108,117,.08)' : 'rgba(213,164,71,.08)';
                     const border     = isCritical ? 'rgba(228,108,117,.18)' : 'rgba(213,164,71,.18)';
                     return `
@@ -1418,11 +1637,12 @@ export async function setupDashboardLogic(router) {
                 salesChartInstance.update(); return;
             }
         }
-        const ctx    = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d');
+        const palette = getDashboardPalette();
         const gSales = ctx.createLinearGradient(0, 0, 0, 280);
-        gSales.addColorStop(0, 'rgba(116,167,255,.28)'); gSales.addColorStop(1, 'rgba(116,167,255,0)');
+        gSales.addColorStop(0, palette.salesFillStart); gSales.addColorStop(1, palette.salesFillEnd);
         const gCosts = ctx.createLinearGradient(0, 0, 0, 280);
-        gCosts.addColorStop(0, 'rgba(228,108,117,.18)');  gCosts.addColorStop(1, 'rgba(228,108,117,0)');
+        gCosts.addColorStop(0, palette.costFillStart);  gCosts.addColorStop(1, palette.costFillEnd);
         const maxValue      = Math.max(...salesData, ...costsData, 0);
         const yTickCallback = (v) => {
             if (maxValue >= 1000000) return `$${(v/1000000).toFixed(1)}M`;
@@ -1435,8 +1655,8 @@ export async function setupDashboardLogic(router) {
             data: {
                 labels,
                 datasets: [
-                    { label: 'Lo que vendí',    data: salesData, borderColor:'#74a7ff', backgroundColor: gSales, borderWidth:3, tension:.38, fill:true, pointBackgroundColor:'#74a7ff', pointBorderColor:'#08111f', pointBorderWidth:2, pointRadius:3, pointHoverRadius:5 },
-                    { label: 'Lo que me costó', data: costsData, borderColor:'#e48b92', backgroundColor: gCosts, borderWidth:2, borderDash:[6,5], tension:.38, fill:true, pointBackgroundColor:'#e48b92', pointBorderColor:'#08111f', pointBorderWidth:2, pointRadius:3 }
+                    { label: 'Lo que vendí',    data: salesData, borderColor: palette.salesLine, backgroundColor: gSales, borderWidth:3, tension:.38, fill:true, pointBackgroundColor: palette.salesLine, pointBorderColor: palette.pointBorder, pointBorderWidth:2, pointRadius:3, pointHoverRadius:5 },
+                    { label: 'Lo que me costó', data: costsData, borderColor: palette.costLine, backgroundColor: gCosts, borderWidth:2, borderDash:[6,5], tension:.38, fill:true, pointBackgroundColor: palette.costLine, pointBorderColor: palette.pointBorder, pointBorderWidth:2, pointRadius:3 }
                 ]
             },
             options: {
@@ -1446,7 +1666,7 @@ export async function setupDashboardLogic(router) {
                 scales: {
                     y: {
                         beginAtZero:true,
-                        grid:{ color:'rgba(148,163,184,.12)' },
+                        grid:{ color: palette.grid },
                         ticks:{ maxTicksLimit:5, callback: yTickCallback, padding: 10, font:{ size: 12, weight: '500' } }
                     },
                     x: {
@@ -1460,6 +1680,7 @@ export async function setupDashboardLogic(router) {
                 }
             }
         });
+        applyChartTheme(salesChartInstance);
     }
 
     loadMetrics();
