@@ -32,8 +32,8 @@ export async function seedDummyData() {
     if (count > 0) return;
 
     await db.products.bulkAdd([
-        { id: crypto.randomUUID(), name: "Cemento Gris 50kg", sku: "CEM-50",  price: 280.00, category: "construccion", stock: 100, business_id: "demo", branch_id: null, img: "https://via.placeholder.com/150" },
-        { id: crypto.randomUUID(), name: "Martillo Uña Curva", sku: "HER-MAR", price: 120.00, category: "herramientas", stock: 15,  business_id: "demo", branch_id: null, img: "https://via.placeholder.com/150" },
-        { id: crypto.randomUUID(), name: "Tubo PVC 2in",        sku: "PLO-PVC", price: 35.00,  category: "plomeria",    stock: 50,  business_id: "demo", branch_id: null, img: "https://via.placeholder.com/150" },
+        { id: crypto.randomUUID(), name: "Cemento Gris 50kg", sku: "CEM-50",  price: 280.00, category: "construccion", stock: 100, business_id: "demo", branch_id: null, image_url: "https://via.placeholder.com/150" },
+        { id: crypto.randomUUID(), name: "Martillo Uña Curva", sku: "HER-MAR", price: 120.00, category: "herramientas", stock: 15,  business_id: "demo", branch_id: null, image_url: "https://via.placeholder.com/150" },
+        { id: crypto.randomUUID(), name: "Tubo PVC 2in",        sku: "PLO-PVC", price: 35.00,  category: "plomeria",    stock: 50,  business_id: "demo", branch_id: null, image_url: "https://via.placeholder.com/150" },
     ]);
 }

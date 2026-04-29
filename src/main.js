@@ -83,6 +83,11 @@ async function requireAuthAndActiveSubscription(router, renderCallback) {
         return;
     }
 
+    // Siempre sincronizar business_id en localStorage con el valor real de Supabase
+    if (profile.business_id) {
+        localStorage.setItem('archsell_business_id', profile.business_id);
+    }
+
     console.log("✅ PERMITIDO: Renderizando vista...");
     renderCallback();
 }

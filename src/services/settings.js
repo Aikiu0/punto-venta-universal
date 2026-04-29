@@ -26,8 +26,13 @@ export const SettingsService = {
             const { data } = await supabase.from('store_settings').select('*').single();
             if (data) {
                 this.config = data;
-                await db.settings.clear();
-                await db.settings.add(data);
+                try {
+                    await db.settings.clear();
+                    // Garantizamos que siempre haya un id para la clave primaria local
+                    await db.settings.put({ id: 1, ...data });
+                } catch (dbErr) {
+                    console.warn('No se pudo guardar settings localmente:', dbErr);
+                }
                 this.applyToDOM();
             }
         }

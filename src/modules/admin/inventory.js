@@ -4,6 +4,7 @@ import { ThemeService } from '../../services/theme.js';
 import { db } from '../../data/db-local.js';
 import { syncService } from '../../services/sync.js';
 import { PermissionService } from '../../services/permissions.js';
+import { BranchService } from '../../services/branchService.js';
 import { renderSidebarHeader } from './components/sidebarHeader.js';
 import { renderAdminSidebarNav } from './components/adminSidebarNav.js';
 let allProducts = [];
@@ -319,13 +320,28 @@ export async function setupInventoryLogic(router) {
 
     // --- CARGA DE PRODUCTOS ---
     async function loadProducts() {
-        allProducts = await db.products.toArray();
+        // Leer el businessId fresco (puede haber sido actualizado por requireAuthAndActiveSubscription)
+        const currentBusinessId = localStorage.getItem('archsell_business_id');
+
+        async function getLocalProducts() {
+            if (currentBusinessId) {
+                try {
+                    const res = await db.products.where('business_id').equals(currentBusinessId).toArray();
+                    if (res.length > 0) return res;
+                } catch (_) {}
+            }
+            // Fallback: mostrar todo lo que haya en la BD local
+            return await db.products.toArray();
+        }
+
+        allProducts = await getLocalProducts();
+
         if (allProducts.length > 0) renderTable(allProducts);
         else tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-secondary);">Sin datos locales. Conectando...</td></tr>`;
 
         if (navigator.onLine) {
             await syncService.downloadProducts();
-            allProducts = await db.products.toArray();
+            allProducts = await getLocalProducts();
             renderTable(allProducts);
         }
     }
@@ -459,6 +475,7 @@ export async function setupInventoryLogic(router) {
             cost_price: parseFloat(pCost.value) || 0,
             price: parseFloat(pPrice.value), stock: parseFloat(pStock.value), is_bulk: pBulk.checked,
             business_id: businessId,
+            branch_id: BranchService.getActiveBranchId() || null,
             image_url: finalImageUrl 
         };
 
