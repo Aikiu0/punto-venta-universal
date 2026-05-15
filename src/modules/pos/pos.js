@@ -339,6 +339,27 @@ export async function setupPOSLogic(router) {
             if (rpcError) throw rpcError;
             if (!rpcData.success) throw new Error(rpcData.message);
 
+            // ── Descontar stock en Supabase para pedidos web ──────
+            for (const i of itemsNormalizados) {
+                if (!i.id) continue;
+                try {
+                    const { data: prod } = await supabase
+                        .from('products')
+                        .select('stock, is_bulk')
+                        .eq('id', i.id)
+                        .single();
+                    if (prod && !prod.is_bulk) {
+                        const qty = Number(i.cantidad || 1);
+                        await supabase
+                            .from('products')
+                            .update({ stock: Math.max(0, (prod.stock ?? 0) - qty) })
+                            .eq('id', i.id);
+                    }
+                } catch (stockErr) {
+                    console.warn(`⚠️ Stock no actualizado para producto ${i.id}:`, stockErr.message);
+                }
+            }
+
             checkPendingOrders();
             mostrarTicket({ uuid: ventaUid, date: new Date(), total: order.total, items: itemsNormalizados, payment: paymentData });
 
@@ -520,10 +541,35 @@ export async function setupPOSLogic(router) {
             
             await db.sales.add(venta);
 
+            // ── Descontar stock en Dexie (local) ─────────────────
             for(const i of itemsTicket) { 
                 const p = await db.products.get(i.id); 
                 if(p && !p.is_bulk){ p.stock -= i.cantidad; await db.products.put(p); } 
             }
+
+            // ── Descontar stock en Supabase directamente (no depende de RPC) ──
+            if (navigator.onLine) {
+                for (const i of itemsTicket) {
+                    if (!i.id || i.is_bulk) continue;
+                    try {
+                        const { data: prod } = await supabase
+                            .from('products')
+                            .select('stock, is_bulk')
+                            .eq('id', i.id)
+                            .single();
+                        if (prod && !prod.is_bulk) {
+                            const qty = Number(i.cantidad || 1);
+                            await supabase
+                                .from('products')
+                                .update({ stock: Math.max(0, (prod.stock ?? 0) - qty) })
+                                .eq('id', i.id);
+                        }
+                    } catch (stockErr) {
+                        console.warn(`⚠️ No se pudo descontar stock del producto ${i.id}:`, stockErr.message);
+                    }
+                }
+            }
+
             productosGlobal = await db.products.toArray(); 
             renderGrid(productosGlobal);
 

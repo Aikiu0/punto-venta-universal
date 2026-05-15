@@ -56,6 +56,30 @@ export const syncService = {
 
                 if (rpcData.success) {
                     console.log(`✅ Venta sincronizada: ${sale.id} (${rpcData.status})`);
+
+                    // ── Descontar stock en Supabase por cada ítem vendido ──
+                    const items = sale.items || [];
+                    for (const item of items) {
+                        if (!item.id || item.is_bulk) continue;
+                        try {
+                            const { data: prod } = await supabase
+                                .from('products')
+                                .select('stock, is_bulk')
+                                .eq('id', item.id)
+                                .single();
+                            if (prod && !prod.is_bulk) {
+                                const qty = Number(item.cantidad || item.qty || 1);
+                                const newStock = Math.max(0, (prod.stock ?? 0) - qty);
+                                await supabase
+                                    .from('products')
+                                    .update({ stock: newStock })
+                                    .eq('id', item.id);
+                            }
+                        } catch (stockErr) {
+                            console.warn(`⚠️ No se pudo descontar stock del producto ${item.id}:`, stockErr.message);
+                        }
+                    }
+
                     await db.sales.update(sale.id, { sync_status: 'synced' });
                 } else {
                     console.error(`⚠️ Venta rechazada: ${rpcData.message}`);

@@ -13,7 +13,7 @@ export const SettingsService = {
 
     async init() {
         try {
-            // 1. Cargar desde Dexie (rápido)
+            // 1. Cargar desde Dexie (rápido, mientras llega la red)
             const local = await db.settings.toArray();
             if (local.length > 0) {
                 this.config = local[0];
@@ -21,14 +21,36 @@ export const SettingsService = {
             }
         } catch (e) { console.log("Iniciando configuración..."); }
 
-        // 2. Sincronizar con Supabase si hay internet
+        // 2. Sincronizar con Supabase usando el negocio del usuario actual
         if (navigator.onLine) {
-            const { data } = await supabase.from('store_settings').select('*').single();
-            if (data) {
-                this.config = data;
-                await db.settings.clear();
-                await db.settings.add(data);
-                this.applyToDOM();
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user) return;
+
+                // Obtener business_id del perfil del usuario
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('business_id')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (!profile?.business_id) return;
+
+                // Leer configuración del negocio del usuario actual
+                const { data: business } = await supabase
+                    .from('businesses')
+                    .select('id, name, logo_url, address, phone, ticket_footer, primary_color')
+                    .eq('id', profile.business_id)
+                    .single();
+
+                if (business) {
+                    this.config = { ...this.config, ...business };
+                    await db.settings.clear();
+                    await db.settings.add({ ...this.config, id: business.id });
+                    this.applyToDOM();
+                }
+            } catch (e) {
+                console.warn("SettingsService: no se pudo sincronizar con Supabase:", e.message);
             }
         }
     },
@@ -70,17 +92,17 @@ export const SettingsService = {
             }
 
             const updates = { ...newSettings, logo_url: logoUrl };
-            
-            // Guardar en Supabase
-            const { error } = await supabase.from('store_settings').update(updates).eq('id', 1);
-            
-            // Si falla, intentamos crear la fila
-            if (error) await supabase.from('store_settings').insert([{ ...updates, id: 1 }]);
+
+            // Guardar en Supabase usando el negocio del usuario actual
+            const businessId = this.config.id;
+            if (businessId) {
+                await supabase.from('businesses').update(updates).eq('id', businessId);
+            }
 
             // Guardar en Local
             this.config = { ...this.config, ...updates };
             await db.settings.clear();
-            await db.settings.add(this.config);
+            await db.settings.add({ ...this.config, id: this.config.id ?? 1 });
             
             this.applyToDOM();
             return true;

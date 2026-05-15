@@ -79,4 +79,155 @@
     padding: 10px;
     background-color: #fee2e2;
     border-radius: 5px;
-} 
+}
+
+/* ── Registro de nuevo cliente ─────────────────────────────────── */
+.register-card {
+    max-width: 480px;
+}
+
+.register-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 1rem;
+    color: #7A3F9D;
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+}
+
+.register-subtitle {
+    color: #6b7280;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 1.8rem;
+}
+
+.register-section-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #7A3F9D;
+    border-bottom: 2px solid #f3e8ff;
+    padding-bottom: 6px;
+    margin-bottom: 1rem;
+}
+
+.register-section-label i {
+    margin-right: 5px;
+}
+
+.required {
+    color: #dc2626;
+}
+
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-wrapper input {
+    padding-right: 2.8rem;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #9ca3af;
+    font-size: 1rem;
+    padding: 4px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.toggle-password:hover {
+    color: #7A3F9D;
+}
+
+.register-success-box {
+    text-align: center;
+    padding: 1.5rem 0;
+}
+
+.register-success-icon {
+    font-size: 3.5rem;
+    color: #16a34a;
+    margin-bottom: 0.75rem;
+}
+
+.register-success-box h2 {
+    color: #111827;
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+}
+
+.register-success-box p {
+    color: #4b5563;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.btn-resend {
+    margin-top: 1.2rem;
+    padding: 0.6rem 1.4rem;
+    background: transparent;
+    color: #7A3F9D;
+    border: 2px solid #7A3F9D;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    width: 100%;
+}
+
+.btn-resend:hover:not(:disabled) {
+    background: #7A3F9D;
+    color: white;
+}
+
+.btn-resend:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.register-footer-link {
+    margin-top: 1.5rem;
+    text-align: center;
+    border-top: 1px solid #f3f4f6;
+    padding-top: 1rem;
+}
+
+.register-footer-link a {
+    color: #7A3F9D;
+    font-size: 0.85rem;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.register-footer-link a:hover {
+    text-decoration: underline;
+}
+
+/* ── Spinner de carga (setup-account) ─────────────────────────── */
+.setup-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3e8ff;
+    border-top-color: #7A3F9D;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
