@@ -5,21 +5,21 @@ import Dexie from 'dexie';
 export const db = new Dexie('PuntoVentaDB');
 
 // ── VERSIÓN 5: agrega branch_id a products y sales ──────────────
-// Dexie detecta automáticamente el cambio de versión y actualiza
-// el esquema sin borrar los datos existentes.
 db.version(5).stores({
-    // products: branch_id para filtrar por sucursal
     products: 'id, sku, name, category, business_id, branch_id',
+    sales:    '++id, date, sync_status, business_id, branch_id',
+    settings: 'id'
+});
 
-    // sales: branch_id para historial por sucursal
-    sales: '++id, date, sync_status, business_id, branch_id',
-
-    // settings: sin cambios
+// ── VERSIÓN 6: fuerza reapertura limpia si hay conflicto de esquema ──
+db.version(6).stores({
+    products: 'id, sku, name, category, business_id, branch_id',
+    sales:    '++id, date, sync_status, business_id, branch_id',
     settings: 'id'
 });
 
 db.on('populate', () => {
-    console.log("Base de datos creada/actualizada a versión 5 (multisucursal).");
+    console.log("Base de datos creada/actualizada a versión 6 (multisucursal).");
 });
 
 export async function isDbEmpty() {

@@ -23,6 +23,8 @@ import { renderSuppliers, setupSuppliersLogic } from './modules/admin/suppliers.
 import { renderAdminBilling, setupBillingLogic } from './modules/admin/billing.js';
 import { hasValidAccess } from './services/subscription.js';
 import { renderResetPassword, setupResetPasswordLogic } from './modules/auth/reset-password.js';
+import { renderRegister, setupRegisterLogic } from './modules/auth/register.js';
+import { renderSetupAccount, setupSetupAccountLogic } from './modules/auth/setup-account.js';
 
 // ── NUEVAS IMPORTACIONES MULTISUCURSAL ──────────────────────────
 import { renderBranches, setupBranchesLogic } from './modules/admin/branches.js';
@@ -119,8 +121,15 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 if (window.location.hash.includes('access_token')) {
-    console.log("Token de Supabase detectado en la URL.");
-    if (window.location.hash.includes('type=invite') || window.location.hash.includes('type=recovery')) {
+    console.log('Token de Supabase detectado en la URL.');
+    if (window.location.hash.includes('type=invite')) {
+        // Invitación nueva: el cliente debe configurar negocio + contraseña
+        setTimeout(() => { router.navigate('/setup-account'); }, 800);
+    } else if (window.location.hash.includes('type=magiclink') || window.location.hash.includes('type=email')) {
+        // Magic link enviado desde /register: igual va al onboarding
+        setTimeout(() => { router.navigate('/setup-account'); }, 800);
+    } else if (window.location.hash.includes('type=recovery')) {
+        // Recuperación de contraseña: solo restablecer contraseña
         setTimeout(() => { router.navigate('/reset-password'); }, 800);
     }
 }
@@ -137,6 +146,18 @@ router
         const app = document.getElementById('app');
         app.innerHTML = renderResetPassword();
         setupResetPasswordLogic(router);
+    })
+
+    // ONBOARDING POST-INVITACIÓN (el cliente llega desde el email de Supabase)
+    .on('/setup-account', () => {
+        setContent(renderSetupAccount());
+        setupSetupAccountLogic(router);
+    })
+
+    // REGISTRO ALTERNATIVO (link externo post-pago, sin invitación previa)
+    .on('/register', () => {
+        setContent(renderRegister());
+        setupRegisterLogic();
     })
 
     // 2. SUSPENSIÓN
